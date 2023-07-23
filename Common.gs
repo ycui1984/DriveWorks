@@ -6,7 +6,8 @@ function onHomepage(e) {
   return createHomeCard();
 }
 
-function iterateFolder(folder, operation, entity, includeSubfolder, dryrun) {
+function iterateFolder(folder, operation, entity, include_subfolder, dryrun, target_file_type) {
+  console.log('iterate entity in folder: folder = ' + folder + ', operation = ' + operation + ', entity = ' + entity + ', include_subfolder = ' + include_subfolder + ', dryrun = ' + dryrun + ', target_file_type = ' + target_file_type);
   
 }
 
@@ -28,25 +29,25 @@ function parseFolderFromEvent(e) {
 function deleteFileHandler(e) {
   console.log('deleteFileHandler = ' + JSON.stringify(e));
   var folder = parseFolderFromEvent(e);
-  iterateFolder(folder, "delete", "file", JSON.parse(e.parameters.include_subfolder), JSON.parse(e.parameters.dryrun));
+  iterateFolder(folder, "delete", "file", JSON.parse(e.parameters.include_subfolder), JSON.parse(e.parameters.dryrun), e.formInput.file_type_field);
 }
 
 function deleteFolderHandler(e) {
   console.log('deleteFolderHandler = ' + JSON.stringify(e));
   var folder = parseFolderFromEvent(e);
-  iterateFolder(folder, "delete", "folder", JSON.parse(e.parameters.include_subfolder), JSON.parse(e.parameters.dryrun));
+  iterateFolder(folder, "delete", "folder", JSON.parse(e.parameters.include_subfolder), JSON.parse(e.parameters.dryrun), null);
 }
 
 function renameFileHandler(e) {
   console.log('renameFileHandler = ' + JSON.stringify(e));  
   var folder = parseFolderFromEvent(e);
-  iterateFolder(folder, "rename", "file", JSON.parse(e.parameters.include_subfolder), JSON.parse(e.parameters.dryrun));
+  iterateFolder(folder, "rename", "file", JSON.parse(e.parameters.include_subfolder), JSON.parse(e.parameters.dryrun), e.formInput.file_type_field);
 }
 
 function renameFolderHandler(e) {
   console.log('renameFolderHandler = ' + JSON.stringify(e));
   var folder = parseFolderFromEvent(e);
-  iterateFolder(folder, "rename", "folder", JSON.parse(e.parameters.include_subfolder), JSON.parse(e.parameters.dryrun));
+  iterateFolder(folder, "rename", "folder", JSON.parse(e.parameters.include_subfolder), JSON.parse(e.parameters.dryrun), null);
 }
 
 function getFileTypeWidget() {
@@ -334,10 +335,6 @@ function createRenameFolderCard(rename_method="rename_partial", include_subfolde
 
   return card.build();  
 }
-
-// configureMore = {"userTimezone":{"offSet":"-25200000","id":"America/Los_Angeles"},"formInputs":{"entity_type_field":["file"],"include_subfolders_field":["include_subfolder"],"drive_operation_type_field":["delete"],"dryrun_field":["dryrun"]},"hostApp":"drive","drive":{"activeCursorItem":{"title":"abc","mimeType":"application/vnd.google-apps.folder","iconUrl":"https://drive-thirdparty.googleusercontent.com/16/type/application/vnd.google-apps.folder","id":"1CsZh2mum4zrixeJ1v_O0ztmQwiuukvfF"}},"parameters":{},"commonEventObject":{"userLocale":"en","platform":"WEB","hostApp":"DRIVE","formInputs":{"drive_operation_type_field":{"stringInputs":{"value":["delete"]}},"entity_type_field":{"stringInputs":{"value":["file"]}},"include_subfolders_field":{"stringInputs":{"value":["include_subfolder"]}},"dryrun_field":{"stringInputs":{"value":["dryrun"]}}},"timeZone":{"offset":-25200000,"id":"America/Los_Angeles"}},"clientPlatform":"web","userCountry":"","formInput":{"dryrun_field":"dryrun","drive_operation_type_field":"delete","entity_type_field":"file","include_subfolders_field":"include_subfolder"},"userLocale":"en"}
-
-//configureMore = {"formInputs":{"entity_type_field":["file"],"drive_operation_type_field":["delete"]},"parameters":{},"clientPlatform":"web","userLocale":"en","drive":{"activeCursorItem":{"id":"1CsZh2mum4zrixeJ1v_O0ztmQwiuukvfF","title":"abc","iconUrl":"https://drive-thirdparty.googleusercontent.com/16/type/application/vnd.google-apps.folder","mimeType":"application/vnd.google-apps.folder"}},"commonEventObject":{"platform":"WEB","userLocale":"en","hostApp":"DRIVE","timeZone":{"id":"America/Los_Angeles","offset":-25200000},"formInputs":{"entity_type_field":{"stringInputs":{"value":["file"]}},"drive_operation_type_field":{"stringInputs":{"value":["delete"]}}}},"hostApp":"drive","formInput":{"drive_operation_type_field":"delete","entity_type_field":"file"},"userTimezone":{"id":"America/Los_Angeles","offSet":"-25200000"},"userCountry":""}
 
 function configureMore(e) {
   console.log('configureMore = ' + JSON.stringify(e));
