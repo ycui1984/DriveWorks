@@ -1,14 +1,256 @@
 function onHomepage(e) {
   console.log('onHomePage = ' + JSON.stringify(e));
-  var properties = PropertiesService.getUserProperties();
-  var email = Session.getEffectiveUser().getEmail();
-  properties.deleteProperty(email);
   return createHomeCard();
 }
 
-function iterateFolder(folder, operation, entity, include_subfolder, dryrun, target_file_type) {
-  console.log('iterate entity in folder: folder = ' + folder + ', operation = ' + operation + ', entity = ' + entity + ', include_subfolder = ' + include_subfolder + ', dryrun = ' + dryrun + ', target_file_type = ' + target_file_type);
+function applyDeleteOnFile(file, dryrun) {
+  if (dryrun) {
+    console.log('Deleting file ' + file.getName());
+    return;
+  }
+
+  file.setTrashed(true);
+}
+
+function applyDeleteOnFolder(folder, dryrun, delete_ops) {
+  if (delete_ops.delete_empty_folder) {
+    var isEmpty = folder.getFiles().hasNext();
+    if (!isEmpty) return;
+  }
+  if (dryrun) {
+    console.log('Deleting folder ' + folder.getName());
+    return;
+  }
+
+  folder.setTrashed(true);
+}
+
+function getNewName(name, rename_ops) {
+  if (rename_ops.rename_method === "rename_partial") {
+    return name.replaceAll(search, replace);
+  } 
   
+  if (rename_ops.rename_method === "rename_full") {
+    return rename_ops.fullname;
+  } 
+  
+  if (rename_ops.rename_method === "rename_adding") {
+    return (rename_ops.before === null)? "" : rename_ops.before + name + (rename_ops.after === null)? "" : rename_ops.after;
+  } 
+  
+  throw "Unsupported rename ops = " + rename_ops.rename_method;  
+}
+
+function applyRenameOnFile(file, dryrun, rename_ops) {
+  if (dryrun) {
+    console.log('Renaming file ' + file.getName());
+    return;
+  }
+
+  var new_name = getNewName(file.getName(), rename_ops);
+  file.setName(new_name);
+}
+
+function applyRenameOnFolder(folder, dryrun, rename_ops) {
+  if (dryrun) {
+    console.log('Renaming folder ' + folder.getName());
+    return;
+  }
+
+  var new_name = getNewName(folder.getName(), rename_ops);
+  folder.setName(new_name);  
+}
+
+function nextIteration(iterationState, operation, entity, include_subfolder, dryrun, delete_ops, rename_ops) {
+  var currentIteration = iterationState[iterationState.length-1];
+  if (currentIteration.fileIteratorContinuationToken !== null) {
+    var fileIterator = DriveApp.continueFileIterator(currentIteration.fileIteratorContinuationToken);
+    if (fileIterator.hasNext()) {
+      var file = fileIterator.next();
+      if (entity === "file") {
+        if (operation === "delete") {
+          applyDeleteOnFile(file, dryrun);
+        } else if (operation === "rename") {
+          applyRenameOnFile(file, dryrun, rename_ops);
+        } else {
+          throw "nextIteration: Unsupported operation type for file = " + operation;
+        }
+      }
+      currentIteration.fileIteratorContinuationToken = fileIterator.getContinuationToken();
+      iterationState[iterationState.length-1] = currentIteration;
+      return iterationState;
+    } 
+    
+    currentIteration.fileIteratorContinuationToken = null;
+    iterationState[iterationState.length-1] = currentIteration;
+    return iterationState;
+  }
+
+  if (currentIteration.folderIteratorContinuationToken !== null) {
+    var folderIterator = DriveApp.continueFolderIterator(currentIteration.folderIteratorContinuationToken);
+    if (folderIterator.hasNext()) {
+      var folder = folderIterator.next();
+      if (entity === "folder") {
+        if (operation === "delete") {
+          applyDeleteOnFolder(folder, dryrun, delete_ops);
+        } else if (operation === "rename") {
+          applyRenameOnFolder(folder, dryrun, rename_ops);
+        } else {
+          throw "nextIteration: Unsupported operation type for folder = " + operation;
+        }
+      }
+      iterationState[iterationState.length-1].folderIteratorContinuationToken = folderIterator.getContinuationToken();
+      if (include_subfolder) {
+        iterationState.push(makeIterationFromFolder(folder, operation, entity, delete_ops, rename_ops));
+      }
+      return iterationState;
+    } 
+    
+    iterationState.pop();
+    return iterationState;
+  }
+}
+
+function getMatchStr(ops) {
+  return ops.search;
+}
+
+/*
+    .addItem("Microsoft Word (.doc)", "word1", false)
+    .addItem("Microsoft Word (.docx)", "word2", false)
+    .addItem("Microsoft Excel (.xls)", "excel1", false)
+    .addItem("Microsoft Excel (.xlsx)", "excel2", false)
+    .addItem("Microsoft Powerpoint (.ppt)", "ppt1", false)
+    .addItem("Microsoft Powerpoint (.pptx)", "ppt2", false)
+    .addItem("OpenDocument Text (.odt)", "odt", false)
+    .addItem("OpenDocument Spreadsheet (.ods)", "ods", false)
+    .addItem("OpenDocument Presentation (.odp)", "odp", false)
+    .addItem("OpenDocument Graphics (.odg)", "odg", false);
+
+  if (type === "pdf") return "application/pdf";
+  if (type === "bmp") return "image/bmp";
+  if (type === "gif") return "image/gif";
+  if (type === "jpeg") return "image/jpeg";
+  if (type === "png") return "image/png";
+  if (type === "svg") return "image/svg+xml";
+  if (type === "css") return "text/css";
+  if (type === "csv") return "text/csv";
+  if (type === "html") return "text/html";
+  if (type === "js") return "application/javascript";
+  if (type === "txt") return "text/plain";
+  if (type === "rtf") return "text/rtf";
+  if (type === "zip") return "application/zip";
+
+*/
+function getMimeType(ops) {
+  var type = ops.file_type;
+  if (type === "all") return null;
+  if (type === "spreadsheet") return "application/vnd.google-apps.spreadsheet";
+  if (type === "doc") return "application/vnd.google-apps.document";
+  if (type === "slide") return "application/vnd.google-apps.presentation";
+  if (type === "form") return "application/vnd.google-apps.form";
+  if (type === "sites") return "application/vnd.google-apps.site";
+  if (type === "drawing") return "application/vnd.google-apps.drawing";
+  if (type === "appscript") return "application/vnd.google-apps.script";
+  throw "Unsupported mime type = " + type;
+
+}
+
+function getSearchToken(entity, mimeType, matchStr) {
+    var searchStr = null;
+    if (mimeType !== null) {
+      searchStr = "mimeType = " + mimeType;
+    }
+    if (matchStr !== null) {
+      if (searchStr !== null) {
+        searchStr += " and ";
+      }
+      searchStr += "name contains '" + matchStr + "'";
+    }
+      
+    if (searchStr !== null) {
+      console.log('Get token via search string = ' + searchStr);
+      if (entity === "file") {
+        return folder.searchFiles(searchStr).getContinuationToken();
+      }
+
+      return folder.searchFolders(searchStr).getContinuationToken();
+    }
+
+    return null;
+}
+
+function makeIterationFromFolder(folder, operation, entity, delete_ops, rename_ops) {
+  var iteration = {
+    folderName: folder.getName(), 
+    fileIteratorContinuationToken: folder.getFiles().getContinuationToken(),
+    folderIteratorContinuationToken: folder.getFolders().getContinuationToken()
+  };
+
+  if (operation === "delete") {
+    if (entity === "file") {
+      console.log('mime type = ' + getMimeType(delete_ops) + ', match str = ' + getMatchStr(delete_ops));
+      var token = getSearchToken(entity, getMimeType(delete_ops), getMatchStr(delete_ops));
+      if (token !== null) {
+        console.log('search file token is not null = ' + token);
+        iteration.fileIteratorContinuationToken = token;
+      }
+    } else {
+      var token = getSearchToken(entity, null, getMatchStr(delete_ops));
+      if (token !== null) {
+        iteration.folderIteratorContinuationToken = token;
+      }
+    }
+  } else if (operation === "rename") {
+    if (entity === "file") {
+      var token = getSearchToken(entity, getMimeType(rename_ops), getMatchStr(rename_ops));
+      if (token !== null) {
+        iteration.fileIteratorContinuationToken = token;
+      }
+    } else {
+      var token = getSearchToken(entity, null, getMatchStr(rename_ops));
+      if (token !== null) {
+        iteration.folderIteratorContinuationToken = token;
+      }
+    }
+  }
+
+  return iteration;
+}
+
+function iterateFolder(folder, operation, entity, include_subfolder, dryrun, delete_ops, rename_ops) {
+  var email = Session.getEffectiveUser().getEmail();
+  console.log('Iterate entity in folder: email = ' + email + ', folder = ' + folder + ', operation = ' + operation + ', entity = ' + entity + ', include_subfolder = ' + include_subfolder + ', dryrun = ' + dryrun + ', delete_ops = ' + JSON.stringify(delete_ops) + ', rename_ops = ' + JSON.stringify(rename_ops));
+  var MAX_RUNNING_TIME_MS = 4.5 * 60 * 1000;
+  var startTime = (new Date()).getTime();
+  var iterationState = JSON.parse(PropertiesService.getUserProperties().getProperty(email));
+  if (iterationState !== null) {
+    if (folder.getName() !== iterationState[0].folderName) {
+      console.error("Iterating a new folder: " + folder.getName() + ". End early since existing operation is not done.");
+      return;
+    }
+    console.info("Resuming iteration for folder: " + folder.getName());
+  }
+  if (iterationState === null) {
+    console.info("Starting new iteration for folder: " + folder.getName());
+    iterationState = [];
+    iterationState.push(makeIterationFromFolder(folder, operation, entity, delete_ops, rename_ops));
+  }  
+
+  while (iterationState.length > 0) {
+    iterationState = nextIteration(iterationState, operation, entity, include_subfolder, dryrun, delete_ops, rename_ops);
+    var currTime = (new Date()).getTime();
+    var elapsedTimeInMS = currTime - startTime;
+    var timeLimitExceeded = elapsedTimeInMS >= MAX_RUNNING_TIME_MS;
+    if (timeLimitExceeded) {
+      PropertiesService.getUserProperties().setProperty(email, JSON.stringify(iterationState));
+      console.info("Stopping loop after '%d' milliseconds.", elapsedTimeInMS);
+      return;
+    }
+  }
+
+  console.info("Done iterating. Deleting iterating state ... ");
+  PropertiesService.getUserProperties().deleteProperty(email);
 }
 
 
@@ -29,25 +271,56 @@ function parseFolderFromEvent(e) {
 function deleteFileHandler(e) {
   console.log('deleteFileHandler = ' + JSON.stringify(e));
   var folder = parseFolderFromEvent(e);
-  iterateFolder(folder, "delete", "file", JSON.parse(e.parameters.include_subfolder), JSON.parse(e.parameters.dryrun), e.formInput.file_type_field);
+  var filename_match = ('file_name_field' in e.formInput)? e.formInput.file_name_field : null;
+  var delete_ops = {
+    file_type: e.formInput.file_type_field,
+    search: filename_match,
+    delete_empty_folder: null,
+  }
+  iterateFolder(folder, "delete", "file", JSON.parse(e.parameters.include_subfolder), JSON.parse(e.parameters.dryrun), delete_ops, null);
 }
 
 function deleteFolderHandler(e) {
   console.log('deleteFolderHandler = ' + JSON.stringify(e));
   var folder = parseFolderFromEvent(e);
-  iterateFolder(folder, "delete", "folder", JSON.parse(e.parameters.include_subfolder), JSON.parse(e.parameters.dryrun), null);
+  var foldername_match = ('folder_name_field' in e.formInput)? e.formInput.folder_name_field : null;
+  var delete_empty_folder = ('delete_empty_folders_field' in e.formInput)? true : false;
+  var delete_ops = {
+    file_type: null,
+    search: foldername_match,
+    delete_empty_folder: delete_empty_folder,
+  }
+  iterateFolder(folder, "delete", "folder", JSON.parse(e.parameters.include_subfolder), JSON.parse(e.parameters.dryrun), delete_ops, null);
 }
 
 function renameFileHandler(e) {
   console.log('renameFileHandler = ' + JSON.stringify(e));  
   var folder = parseFolderFromEvent(e);
-  iterateFolder(folder, "rename", "file", JSON.parse(e.parameters.include_subfolder), JSON.parse(e.parameters.dryrun), e.formInput.file_type_field);
+  var rename_ops = {
+    method: e.formInput.rename_method_field,  
+    file_type: e.formInput.file_type_field,
+    search: ("file_name_search_field" in e.formInput)? e.formInput.file_name_search_field : null,
+    replace: ("file_name_replace_field" in e.formInput)? e.formInput.file_name_replace_field : null,
+    fullname: ("new_file_name_field" in e.formInput)? e.formInput.new_file_name_field : null,
+    before: ("file_name_before_field" in e.formInput)? e.formInput.file_name_before_field: null,
+    after: ("file_name_after_field" in e.formInput)? e.formInput.file_name_after_field : null,
+  }
+  iterateFolder(folder, "rename", "file", JSON.parse(e.parameters.include_subfolder), JSON.parse(e.parameters.dryrun), null, rename_ops);
 }
 
 function renameFolderHandler(e) {
   console.log('renameFolderHandler = ' + JSON.stringify(e));
   var folder = parseFolderFromEvent(e);
-  iterateFolder(folder, "rename", "folder", JSON.parse(e.parameters.include_subfolder), JSON.parse(e.parameters.dryrun), null);
+  var rename_ops = {
+    method: e.formInput.rename_method_field,  
+    file_type: null,
+    search: ("folder_name_search_field" in e.formInput)? e.formInput.folder_name_search_field : null,
+    replace: ("folder_name_replace_field" in e.formInput)? e.formInput.folder_name_replace_field : null,
+    fullname: ("new_folder_name_field" in e.formInput)? e.formInput.new_folder_name_field : null,
+    before: ("folder_name_before_field" in e.formInput)? e.formInput.folder_name_before_field: null,
+    after: ("folder_name_after_field" in e.formInput)? e.formInput.folder_name_after_field : null,
+  }
+  iterateFolder(folder, "rename", "folder", JSON.parse(e.parameters.include_subfolder), JSON.parse(e.parameters.dryrun), null, rename_ops);
 }
 
 function getFileTypeWidget() {
@@ -133,7 +406,7 @@ function createDeleteFolderCard(include_subfolder, dryrun) {
   var deleteEmpty = CardService.newSelectionInput()
     .setType(CardService.SelectionInputType.CHECK_BOX)
     .setFieldName("delete_empty_folders_field")
-    .addItem("Delete folders with no files only", "delete_empty_folder", true);
+    .addItem("Delete empty folders only", "delete_empty_folder", true);
   mainSection.addWidget(deleteEmpty);
 
   var foldernameMatch = CardService.newTextInput()
