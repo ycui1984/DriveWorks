@@ -3,62 +3,75 @@ function onHomepage(e) {
   return createHomeCard();
 }
 
-function applyDeleteOnFile(file, dryrun) {
-  if (dryrun) {
-    console.log('Deleting file ' + file.getName());
-    return;
-  }
+function applyDeleteOnFile(file, dryrun, delete_ops) {
+  var matchStr = getMatchStr(delete_ops);
+  if (matchStr === null || file.getName().includes(matchStr)) {
+    if (dryrun) {
+      console.log('Deleting file ' + file.getName());
+      return;
+    }
 
-  file.setTrashed(true);
+    file.setTrashed(true);
+  }
 }
 
 function applyDeleteOnFolder(folder, dryrun, delete_ops) {
-  if (delete_ops.delete_empty_folder) {
-    var isEmpty = folder.getFiles().hasNext();
-    if (!isEmpty) return;
-  }
-  if (dryrun) {
-    console.log('Deleting folder ' + folder.getName());
-    return;
-  }
+  var matchStr = getMatchStr(delete_ops);
+  var notEmpty = folder.getFiles().hasNext();
+  if (matchStr === null || folder.getName().includes(matchStr)) {
+    if (delete_ops.delete_empty_folder) {
+      if (notEmpty) return;
+    }
+    if (dryrun) {
+      console.log('Deleting folder ' + folder.getName());
+      return;
+    }
 
-  folder.setTrashed(true);
+    folder.setTrashed(true);
+  }
 }
 
+
 function getNewName(name, rename_ops) {
-  if (rename_ops.rename_method === "rename_partial") {
-    return name.replaceAll(search, replace);
+  if (rename_ops.method === "rename_partial") {
+    return name.replaceAll(rename_ops.search, rename_ops.replace);
   } 
   
-  if (rename_ops.rename_method === "rename_full") {
+  if (rename_ops.method === "rename_full") {
     return rename_ops.fullname;
   } 
   
-  if (rename_ops.rename_method === "rename_adding") {
-    return (rename_ops.before === null)? "" : rename_ops.before + name + (rename_ops.after === null)? "" : rename_ops.after;
+  if (rename_ops.method === "rename_adding") {
+    return ((rename_ops.before === null)? "" : rename_ops.before) + name + ((rename_ops.after === null)? "" : rename_ops.after);
   } 
   
   throw "Unsupported rename ops = " + rename_ops.rename_method;  
 }
 
 function applyRenameOnFile(file, dryrun, rename_ops) {
-  if (dryrun) {
-    console.log('Renaming file ' + file.getName());
-    return;
-  }
+  var matchStr = getMatchStr(rename_ops);
+  if (matchStr === null || file.getName().includes(matchStr)) {
+    var new_name = getNewName(file.getName(), rename_ops);
+    if (dryrun) {
+      console.log('Renaming file ' + file.getName() + ' into new name = ' + new_name);
+      return;
+    }
 
-  var new_name = getNewName(file.getName(), rename_ops);
-  file.setName(new_name);
+    file.setName(new_name);
+  }
 }
 
 function applyRenameOnFolder(folder, dryrun, rename_ops) {
-  if (dryrun) {
-    console.log('Renaming folder ' + folder.getName());
-    return;
-  }
+  var matchStr = getMatchStr(rename_ops);
+  if (matchStr === null || folder.getName().includes(matchStr)) {
+    var new_name = getNewName(folder.getName(), rename_ops);
+    if (dryrun) {
+      console.log('Renaming folder ' + folder.getName() + ' into new name = ' + new_name);
+      return;
+    }
 
-  var new_name = getNewName(folder.getName(), rename_ops);
-  folder.setName(new_name);  
+    folder.setName(new_name);  
+  }
 }
 
 function nextIteration(iterationState, operation, entity, include_subfolder, dryrun, delete_ops, rename_ops) {
@@ -69,7 +82,7 @@ function nextIteration(iterationState, operation, entity, include_subfolder, dry
       var file = fileIterator.next();
       if (entity === "file") {
         if (operation === "delete") {
-          applyDeleteOnFile(file, dryrun);
+          applyDeleteOnFile(file, dryrun, delete_ops);
         } else if (operation === "rename") {
           applyRenameOnFile(file, dryrun, rename_ops);
         } else {
@@ -115,104 +128,97 @@ function getMatchStr(ops) {
   return ops.search;
 }
 
-/*
-    .addItem("Microsoft Word (.doc)", "word1", false)
-    .addItem("Microsoft Word (.docx)", "word2", false)
-    .addItem("Microsoft Excel (.xls)", "excel1", false)
-    .addItem("Microsoft Excel (.xlsx)", "excel2", false)
-    .addItem("Microsoft Powerpoint (.ppt)", "ppt1", false)
-    .addItem("Microsoft Powerpoint (.pptx)", "ppt2", false)
-    .addItem("OpenDocument Text (.odt)", "odt", false)
-    .addItem("OpenDocument Spreadsheet (.ods)", "ods", false)
-    .addItem("OpenDocument Presentation (.odp)", "odp", false)
-    .addItem("OpenDocument Graphics (.odg)", "odg", false);
-
-  if (type === "pdf") return "application/pdf";
-  if (type === "bmp") return "image/bmp";
-  if (type === "gif") return "image/gif";
-  if (type === "jpeg") return "image/jpeg";
-  if (type === "png") return "image/png";
-  if (type === "svg") return "image/svg+xml";
-  if (type === "css") return "text/css";
-  if (type === "csv") return "text/csv";
-  if (type === "html") return "text/html";
-  if (type === "js") return "application/javascript";
-  if (type === "txt") return "text/plain";
-  if (type === "rtf") return "text/rtf";
-  if (type === "zip") return "application/zip";
-
-*/
 function getMimeType(ops) {
   var type = ops.file_type;
-  if (type === "all") return null;
-  if (type === "spreadsheet") return "application/vnd.google-apps.spreadsheet";
-  if (type === "doc") return "application/vnd.google-apps.document";
-  if (type === "slide") return "application/vnd.google-apps.presentation";
-  if (type === "form") return "application/vnd.google-apps.form";
-  if (type === "sites") return "application/vnd.google-apps.site";
-  if (type === "drawing") return "application/vnd.google-apps.drawing";
-  if (type === "appscript") return "application/vnd.google-apps.script";
-  throw "Unsupported mime type = " + type;
-
+  if (type === "spreadsheet") return MimeType.GOOGLE_SHEETS;
+  if (type === "doc") return MimeType.GOOGLE_DOCS;
+  if (type === "slide") return MimeType.GOOGLE_SLIDES;
+  if (type === "form") return MimeType.GOOGLE_FORMS;
+  if (type === "sites") return MimeType.GOOGLE_SITES;
+  if (type === "drawing") return MimeType.GOOGLE_DRAWINGS;
+  if (type === "appscript") return MimeType.GOOGLE_APPS_SCRIPT;
+  if (type === "pdf") return MimeType.PDF;
+  if (type === "bmp") return MimeType.BMP;
+  if (type === "gif") return MimeType.GIF;
+  if (type === "jpeg") return MimeType.JPEG;
+  if (type === "png") return MimeType.PNG;
+  if (type === "svg") return MimeType.SVG;
+  if (type === "css") return MimeType.CSS;
+  if (type === "csv") return MimeType.CSV;
+  if (type === "html") return MimeType.HTML;
+  if (type === "js") return MimeType.JAVASCRIPT;
+  if (type === "txt") return MimeType.PLAIN_TEXT;
+  if (type === "rtf") return MimeType.RTF;
+  if (type === "zip") return MimeType.ZIP;
+  if (type === "word1") return MimeType.MICROSOFT_WORD_LEGACY;
+  if (type === "word2") return MimeType.MICROSOFT_WORD;
+  if (type === "excel1") return MimeType.MICROSOFT_EXCEL_LEGACY;
+  if (type === "excel2") return MimeType.MICROSOFT_EXCEL;
+  if (type === "ppt1") return MimeType.MICROSOFT_POWERPOINT_LEGACY;
+  if (type === "ppt2") return MimeType.MICROSOFT_POWERPOINT;
+  if (type === "odt") return MimeType.OPENDOCUMENT_TEXT;
+  if (type === "ods") return MimeType.OPENDOCUMENT_SPREADSHEET;
+  if (type === "odp") return MimeType.OPENDOCUMENT_PRESENTATION;
+  if (type === "odg") return MimeType.OPENDOCUMENT_GRAPHICS;
+  return null;
 }
 
-function getSearchToken(entity, mimeType, matchStr) {
-    var searchStr = null;
-    if (mimeType !== null) {
-      searchStr = "mimeType = " + mimeType;
-    }
-    if (matchStr !== null) {
-      if (searchStr !== null) {
-        searchStr += " and ";
-      }
-      searchStr += "name contains '" + matchStr + "'";
-    }
-      
-    if (searchStr !== null) {
-      console.log('Get token via search string = ' + searchStr);
-      if (entity === "file") {
-        return folder.searchFiles(searchStr).getContinuationToken();
-      }
-
-      return folder.searchFolders(searchStr).getContinuationToken();
-    }
-
-    return null;
+function getSearchToken(folder, entity, mimeType) {
+    var searchStr = mimeType === null? null : "mimeType='" + mimeType + "'";
+    if (searchStr === null) {
+      return null;
+    }    
+    console.log('Get token via search string = ' + searchStr);
+    return (entity === "file")? folder.searchFiles(searchStr).getContinuationToken() : folder.searchFolders(searchStr).getContinuationToken();
 }
 
 function makeIterationFromFolder(folder, operation, entity, delete_ops, rename_ops) {
   var iteration = {
     folderName: folder.getName(), 
-    fileIteratorContinuationToken: folder.getFiles().getContinuationToken(),
-    folderIteratorContinuationToken: folder.getFolders().getContinuationToken()
+    fileIteratorContinuationToken: null,
+    folderIteratorContinuationToken: null
   };
 
   if (operation === "delete") {
     if (entity === "file") {
       console.log('mime type = ' + getMimeType(delete_ops) + ', match str = ' + getMatchStr(delete_ops));
-      var token = getSearchToken(entity, getMimeType(delete_ops), getMatchStr(delete_ops));
+      var token = getSearchToken(folder, entity, getMimeType(delete_ops));
       if (token !== null) {
         console.log('search file token is not null = ' + token);
         iteration.fileIteratorContinuationToken = token;
       }
     } else {
-      var token = getSearchToken(entity, null, getMatchStr(delete_ops));
+      var token = getSearchToken(folder, entity, null);
       if (token !== null) {
         iteration.folderIteratorContinuationToken = token;
       }
     }
   } else if (operation === "rename") {
     if (entity === "file") {
-      var token = getSearchToken(entity, getMimeType(rename_ops), getMatchStr(rename_ops));
+      var token = getSearchToken(folder, entity, getMimeType(rename_ops));
       if (token !== null) {
         iteration.fileIteratorContinuationToken = token;
       }
     } else {
-      var token = getSearchToken(entity, null, getMatchStr(rename_ops));
+      var token = getSearchToken(folder, entity, null);
       if (token !== null) {
         iteration.folderIteratorContinuationToken = token;
       }
     }
+  }
+
+  if (iteration.fileIteratorContinuationToken === null) {
+    iteration.fileIteratorContinuationToken = folder.getFiles().getContinuationToken();
+  }
+
+  if (iteration.folderIteratorContinuationToken === null) {
+    iteration.folderIteratorContinuationToken = folder.getFolders().getContinuationToken();
+  }
+
+  /// now iteration has both file token and folder token
+  /// when entity is folder only do not set file token because it is useless
+  if (entity === "folder") {
+    iteration.fileIteratorContinuationToken = null;
   }
 
   return iteration;
@@ -676,7 +682,7 @@ function createHomeCard(item={}) {
   var includeSubfolder = CardService.newSelectionInput()
     .setType(CardService.SelectionInputType.CHECK_BOX)
     .setFieldName("include_subfolders_field")
-    .addItem("Apply to subfolders", "include_subfolder", false);
+    .addItem("Apply to subfolders", "include_subfolder", true);
 
   var configureMoreAction = CardService.newAction()
       .setFunctionName('configureMore');
