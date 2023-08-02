@@ -224,12 +224,73 @@ function makeIterationFromFolder(folder, operation, entity, delete_ops, rename_o
   return iteration;
 }
 
-function iterateFolder(folder, operation, entity, include_subfolder, dryrun, delete_ops, rename_ops) {
+function getJobStatusKey(email) {
+  return email + ":job";
+}
+
+function getJobMetadataKey(email) {
+  return email + ":metadata";
+}
+
+function findTrigger(id) {
+  console.log('findTrigger: finding trigger with id = ' + id);
+  var triggers = ScriptApp.getProjectTriggers();
+  for (var i = 0; i < triggers.length; i++) {
+    if (triggers[i].getUniqueId().toString() === id) {
+      return triggers[i];
+    }
+  }
+  return null;
+}
+
+function onScheduledRun(e) {
+  var triggerId = e.triggerUid.toString();
+  var email = Session.getEffectiveUser().getEmail();
+  var jobMetadataKey = getJobMetadataKey(email);
+  var jobKey = getJobStatusKey(email);
+  var properties = PropertiesService.getUserProperties();
+  var metadata = properties.getProperty(jobMetadataKey);
+  if (metadata === null) {
+    console.log('onScheduleRun: Cannot find job metadata for key ' + jobMetadataKey + '. Skip since no work to do');
+    return;
+  }
+
+  var jobStatus = properties.getProperty(jobKey);
+  if (jobStatus === null) {
+    console.log('onScheduleRun: Cannot find job status for key ' + jobKey);
+    return;
+  }
+
+  // delete previous trigger, not sure whether this is required, but to be safe
+  var trigger = findTrigger(triggerId);
+  if (trigger !== null) {
+    ScriptApp.deleteTrigger(trigger);
+  }
+  var json = JSON.parse(metadata);
+  iterateFolder(json.folder, json.operation, json.entity, json.include_subfolder, json.dryrun, json.delete_ops, json.rename_ops, true);
+}
+
+function iterateFolder(folder, operation, entity, include_subfolder, dryrun, delete_ops, rename_ops, from_trigger=false) {
   var email = Session.getEffectiveUser().getEmail();
   console.log('Iterate entity in folder: email = ' + email + ', folder = ' + folder + ', operation = ' + operation + ', entity = ' + entity + ', include_subfolder = ' + include_subfolder + ', dryrun = ' + dryrun + ', delete_ops = ' + JSON.stringify(delete_ops) + ', rename_ops = ' + JSON.stringify(rename_ops));
   var MAX_RUNNING_TIME_MS = 4.5 * 60 * 1000;
   var startTime = (new Date()).getTime();
-  var iterationState = JSON.parse(PropertiesService.getUserProperties().getProperty(email));
+  var jobKey = getJobStatusKey(email);
+  var properties = PropertiesService.getUserProperties();
+  if (from_trigger === false) {
+    var jobMetadataKey = getJobMetadataKey(email);
+    var metadata = {
+      folder: folder,
+      operation : operation, 
+      entity : entity,
+      include_subfolder : include_subfolder,
+      dryrun : dryrun,
+      delete_ops : delete_ops,
+      rename_ops : rename_ops
+    };
+    properties.setProperty(jobMetadataKey, JSON.stringify(metadata));
+  }
+  var iterationState = JSON.parse(properties.getProperty(jobKey));
   if (iterationState !== null) {
     if (folder.getName() !== iterationState[0].folderName) {
       console.error("Iterating a new folder: " + folder.getName() + ". End early since existing operation is not done.");
@@ -249,14 +310,17 @@ function iterateFolder(folder, operation, entity, include_subfolder, dryrun, del
     var elapsedTimeInMS = currTime - startTime;
     var timeLimitExceeded = elapsedTimeInMS >= MAX_RUNNING_TIME_MS;
     if (timeLimitExceeded) {
-      PropertiesService.getUserProperties().setProperty(email, JSON.stringify(iterationState));
+      properties.setProperty(jobKey, JSON.stringify(iterationState));
       console.info("Stopping loop after '%d' milliseconds.", elapsedTimeInMS);
+      // Continue work after 1s
+      ScriptApp.newTrigger("onScheduledRun").timeBased().after(1000).create();
       return;
     }
   }
 
   console.info("Done iterating. Deleting iterating state ... ");
-  PropertiesService.getUserProperties().deleteProperty(email);
+  properties.deleteProperty(jobKey);
+  properties.deleteProperty(jobMetadataKey);
 }
 
 
@@ -393,6 +457,10 @@ function createDeleteFileCard(include_subfolder, dryrun) {
   var buttonSet = CardService.newButtonSet()
     .addButton(button);
   mainSection.addWidget(buttonSet);
+
+  var status = CardService.newDecoratedText().setText("File deletion progress is going to be shown in a spreadsheet once button is clicked. You will be notified via email once the job completes.").setWrapText(true).setTopLabel("File deletion status is shown below");
+  mainSection.addWidget(status);
+
   var card = CardService.newCardBuilder()
     .setHeader(cardHeader)
     .addSection(paymentSection)
@@ -431,6 +499,9 @@ function createDeleteFolderCard(include_subfolder, dryrun) {
   var buttonSet = CardService.newButtonSet()
     .addButton(button);
   mainSection.addWidget(buttonSet);
+
+  var status = CardService.newDecoratedText().setText("Folder deletion progress is going to be shown in a spreadsheet once button is clicked. You will be notified via email once the job completes.").setWrapText(true).setTopLabel("Folder deletion status is shown below");
+  mainSection.addWidget(status);
   var card = CardService.newCardBuilder()
     .setHeader(cardHeader)
     .addSection(paymentSection)
@@ -520,6 +591,8 @@ function createRenameFileCard(rename_method="rename_partial", include_subfolder,
   var buttonSet = CardService.newButtonSet()
     .addButton(button);
   mainSection.addWidget(buttonSet);
+  var status = CardService.newDecoratedText().setText("File renaming progress is going to be shown in a spreadsheet once button is clicked. You will be notified via email once the job completes.").setWrapText(true).setTopLabel("File renaming status is shown below");
+  mainSection.addWidget(status);
   var card = CardService.newCardBuilder()
     .setHeader(cardHeader)
     .addSection(paymentSection)
@@ -607,6 +680,8 @@ function createRenameFolderCard(rename_method="rename_partial", include_subfolde
   var buttonSet = CardService.newButtonSet()
     .addButton(button);
   mainSection.addWidget(buttonSet);
+  var status = CardService.newDecoratedText().setText("Folder renaming progress is going to be shown in a spreadsheet once button is clicked. You will be notified via email once the job completes.").setWrapText(true).setTopLabel("Folder renaming status is shown below");
+  mainSection.addWidget(status);
   var card = CardService.newCardBuilder()
     .setHeader(cardHeader)
     .addSection(paymentSection)
