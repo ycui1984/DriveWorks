@@ -1,5 +1,10 @@
 function onHomepage(e) {
   console.log('onHomePage = ' + JSON.stringify(e));
+  // var email = Session.getEffectiveUser().getEmail();
+  // var jobMetadataKey = getJobMetadataKey(email);
+  // var properties = PropertiesService.getUserProperties();
+  // properties.deleteProperty(jobMetadataKey);
+  // console.log('CLEAN UP STATUS');
   return createHomeCard();
 }
 
@@ -247,7 +252,6 @@ function onScheduledRun(e) {
   var triggerId = e.triggerUid.toString();
   var email = Session.getEffectiveUser().getEmail();
   var jobMetadataKey = getJobMetadataKey(email);
-  var jobKey = getJobStatusKey(email);
   var properties = PropertiesService.getUserProperties();
   var metadata = properties.getProperty(jobMetadataKey);
   if (metadata === null) {
@@ -255,41 +259,35 @@ function onScheduledRun(e) {
     return;
   }
 
-  var jobStatus = properties.getProperty(jobKey);
-  if (jobStatus === null) {
-    console.log('onScheduleRun: Cannot find job status for key ' + jobKey);
-    return;
-  }
-
-  // delete previous trigger, not sure whether this is required, but to be safe
+  var json = JSON.parse(metadata);
+  var folder = DriveApp.getFolderById(json.folder.id);
+  iterateFolder(folder, json.operation, json.entity, json.include_subfolder, json.dry_run, json.delete_ops, json.rename_ops);
   var trigger = findTrigger(triggerId);
   if (trigger !== null) {
     ScriptApp.deleteTrigger(trigger);
   }
-  var json = JSON.parse(metadata);
-  iterateFolder(json.folder, json.operation, json.entity, json.include_subfolder, json.dryrun, json.delete_ops, json.rename_ops, true);
 }
 
-function iterateFolder(folder, operation, entity, include_subfolder, dryrun, delete_ops, rename_ops, from_trigger=false) {
+function iterateFolder(folder, operation, entity, include_subfolder, dryrun, delete_ops, rename_ops) {
   var email = Session.getEffectiveUser().getEmail();
   console.log('Iterate entity in folder: email = ' + email + ', folder = ' + folder + ', operation = ' + operation + ', entity = ' + entity + ', include_subfolder = ' + include_subfolder + ', dryrun = ' + dryrun + ', delete_ops = ' + JSON.stringify(delete_ops) + ', rename_ops = ' + JSON.stringify(rename_ops));
   var MAX_RUNNING_TIME_MS = 4.5 * 60 * 1000;
   var startTime = (new Date()).getTime();
   var jobKey = getJobStatusKey(email);
   var properties = PropertiesService.getUserProperties();
-  if (from_trigger === false) {
-    var jobMetadataKey = getJobMetadataKey(email);
-    var metadata = {
-      folder: folder,
-      operation : operation, 
-      entity : entity,
-      include_subfolder : include_subfolder,
-      dryrun : dryrun,
-      delete_ops : delete_ops,
-      rename_ops : rename_ops
-    };
-    properties.setProperty(jobMetadataKey, JSON.stringify(metadata));
-  }
+  // var jobMetadataKey = getJobMetadataKey(email);
+  // var metadata = {
+  //     folder: folder,
+  //     operation : operation, 
+  //     entity : entity,
+  //     include_subfolder : include_subfolder,
+  //     dryrun : dryrun,
+  //     delete_ops : delete_ops,
+  //     rename_ops : rename_ops
+  // };
+  // if (properties.getProperty(jobMetadataKey) === null) {
+  //   properties.setProperty(jobMetadataKey, JSON.stringify(metadata));
+  // }
   var iterationState = JSON.parse(properties.getProperty(jobKey));
   if (iterationState !== null) {
     if (folder.getName() !== iterationState[0].folderName) {
@@ -340,6 +338,7 @@ function parseFolderFromEvent(e) {
 
 function deleteFileHandler(e) {
   console.log('deleteFileHandler = ' + JSON.stringify(e));
+  var email = Session.getEffectiveUser().getEmail();
   var folder = parseFolderFromEvent(e);
   var filename_match = ('file_name_field' in e.formInput)? e.formInput.file_name_field : null;
   var delete_ops = {
@@ -347,7 +346,154 @@ function deleteFileHandler(e) {
     search: filename_match,
     delete_empty_folder: null,
   }
-  iterateFolder(folder, "delete", "file", JSON.parse(e.parameters.include_subfolder), JSON.parse(e.parameters.dryrun), delete_ops, null);
+  var dryrun = JSON.parse(e.parameters.dryrun);
+  var include_subfolder = JSON.parse(e.parameters.include_subfolder);
+  var properties = PropertiesService.getUserProperties();
+  var jobMetadataKey = getJobMetadataKey(email);
+  var spreadsheet = SpreadsheetApp.create("DriveWorks_progress_report_" + Date.now());
+  var metadata = {
+      folder: {
+        id: folder.getId(),
+        name: folder.getName()
+      },
+      operation : "delete", 
+      entity : "file",
+      include_subfolder : include_subfolder,
+      dry_run : dryrun,
+      delete_ops : delete_ops,
+      rename_ops : null,
+      report_spreadsheet : {
+        id : spreadsheet.getId(),
+        name: spreadsheet.getName()
+      }
+  };
+  if (properties.getProperty(jobMetadataKey) === null) {
+    properties.setProperty(jobMetadataKey, JSON.stringify(metadata));
+  } else {
+    console.log('job metadata key exists, but it should not, the key =' + jobMetadataKey);
+  }
+  ScriptApp.newTrigger("onScheduledRun").timeBased().after(1000).create();
+  var card = createDeleteFileCard(include_subfolder, dryrun);
+  var navigation = CardService.newNavigation().updateCard(card);
+  var actionResponse = CardService.newActionResponseBuilder()
+      .setNavigation(navigation);
+  return actionResponse.build();
+}
+
+/*
+  var operationType = CardService.newSelectionInput()
+    .setType(CardService.SelectionInputType.RADIO_BUTTON)
+    .setTitle("Select drive operation type")
+    .setFieldName("drive_operation_type_field")
+    .addItem("Delete", "delete", true)
+    .addItem("Rename", "rename", false);
+  var textStart = "Selected operation folder<br><b><font color='#065fd4'>";
+  var textEnd = "</font></b>"; 
+  if ('title' in item) {
+    var text = textStart + item.title + textEnd;
+  } else {
+    var text = textStart + "My Drive" + textEnd;
+  }
+  var selectedFolder = CardService.newDecoratedText().setText(text).setWrapText(true).setBottomLabel("Change by selecting a different folder");
+
+  var dryrun = CardService.newSelectionInput()
+    .setType(CardService.SelectionInputType.CHECK_BOX)
+    .setFieldName("dryrun_field")
+    .addItem("Preview operations only without executing", "dryrun", true);
+
+  var includeSubfolder = CardService.newSelectionInput()
+    .setType(CardService.SelectionInputType.CHECK_BOX)
+    .setFieldName("include_subfolders_field")
+    .addItem("Apply to subfolders", "include_subfolder", true);
+
+  var configureMoreAction = CardService.newAction()
+      .setFunctionName('configureMore');
+  var button = CardService.newTextButton()
+      .setText('Configure Details')
+      .setOnClickAction(configureMoreAction)
+      .setTextButtonStyle(CardService.TextButtonStyle.FILLED);
+  var buttonSet = CardService.newButtonSet()
+      .addButton(button);
+  var mainSection = CardService.newCardSection()
+    .addWidget(operationType)
+    .addWidget(entityType)
+    .addWidget(selectedFolder)
+    .addWidget(dryrun)
+    .addWidget(includeSubfolder)
+    .addWidget(buttonSet);
+
+*/
+
+function deleteJob() {
+  var email = Session.getEffectiveUser().getEmail();
+  var jobMetadataKey = getJobMetadataKey(email);
+  var properties = PropertiesService.getUserProperties();
+  properties.deleteProperty(jobMetadataKey);
+  var navigation = CardService.newNavigation()
+      .popCard();
+  var actionResponse = CardService.newActionResponseBuilder()
+      .setNavigation(navigation);
+  return actionResponse.build();
+}
+
+
+function buildCardViaPropertiesIfExist() {
+  var properties = PropertiesService.getUserProperties();
+  var email = Session.getEffectiveUser().getEmail();
+  var jobMetadataKey = getJobMetadataKey(email);
+  var metadataStr = properties.getProperty(jobMetadataKey);
+  if (metadataStr === null) {
+    return null;
+  }
+  var metadata = JSON.parse(metadataStr);
+  var cardHeader = CardService.newCardHeader()  
+    .setTitle("DriveWorks")
+    .setSubtitle("Job Settings and Status")
+    .setImageUrl(getLogoURL());
+  var paymentSection = getPaymentSection();
+  var mainSection = CardService.newCardSection(); 
+  var operationType = CardService.newDecoratedText().setText("Drive operation type: <b><font color='#065fd4'>" + metadata.operation + "</b>").setWrapText(true).setTopLabel("Primary Job Settings");
+  var entityType = CardService.newDecoratedText().setText("Entity type: <b><font color='#065fd4'>" + metadata.entity + "</b>").setWrapText(true);
+  var folderName = CardService.newDecoratedText().setText("Target folder: <b><font color='#065fd4'>" + metadata.folder.name + "</b>");
+  var dryrun = CardService.newDecoratedText().setText("Is dryrun: <b><font color='#065fd4'>" + metadata.dry_run + "</b>");
+  var include_subfolder = CardService.newDecoratedText().setText("Include subfolder: <b><font color='#065fd4'>" + metadata.include_subfolder + "</b>");
+  mainSection
+    .addWidget(operationType)
+    .addWidget(entityType)
+    .addWidget(folderName)
+    .addWidget(dryrun)
+    .addWidget(include_subfolder);
+  // if (metadata.entity === "file") {
+  //   if (metadata.operation === "delete") {
+  //     var target_file_type = CardService.newDecoratedText().setText("Target file type: <b><font color='#065fd4'>" + metadata.delete_ops.file_type + "</b>");
+  //   } else {
+  //     var target_file_type = CardService.newDecoratedText().setText("Target file type: <b><font color='#065fd4'>" + metadata.rename_ops.file_type + "</b>");      
+  //   }
+  //   mainSection.addWidget(target_file_type);
+  // }
+
+  var spreadsheet = SpreadsheetApp.openById(metadata.report_spreadsheet.id);
+  var link = CardService.newOpenLink()
+        .setUrl(spreadsheet.getUrl())
+        .setOpenAs(CardService.OpenAs.FULL_SIZE)
+        .setOnClose(CardService.OnClose.RELOAD_ADD_ON)
+  var status = CardService.newDecoratedText().setText("<b><font color='#065fd4'>CLICK HERE</b> to monitor job progress. You will be notified via email once the job completes. You are not allowed to start a new job while a previous job is running unless the previous is deleted.").setWrapText(true).setTopLabel("Existing Job Status").setOpenLink(link);
+  mainSection.addWidget(status);  
+  var action = CardService.newAction()
+    .setFunctionName('deleteJob')
+  var button = CardService.newTextButton()
+    .setText('Delete Job')
+    .setOnClickAction(action)
+    .setTextButtonStyle(CardService.TextButtonStyle.FILLED);
+  var buttonSet = CardService.newButtonSet()
+    .addButton(button);
+  mainSection.addWidget(buttonSet);
+  var card = CardService.newCardBuilder()
+    .setHeader(cardHeader)
+    .addSection(paymentSection)
+    .addSection(mainSection);
+
+  return card; 
 }
 
 function deleteFolderHandler(e) {
@@ -360,7 +506,9 @@ function deleteFolderHandler(e) {
     search: foldername_match,
     delete_empty_folder: delete_empty_folder,
   }
-  iterateFolder(folder, "delete", "folder", JSON.parse(e.parameters.include_subfolder), JSON.parse(e.parameters.dryrun), delete_ops, null);
+  var dryrun = JSON.parse(e.parameters.dryrun);
+  var include_subfolder = JSON.parse(e.parameters.include_subfolder);
+  iterateFolder(folder, "delete", "folder", include_subfolder, dryrun, delete_ops, null);
 }
 
 function renameFileHandler(e) {
@@ -432,6 +580,10 @@ function getFileTypeWidget() {
 }
 
 function createDeleteFileCard(include_subfolder, dryrun) {
+  var statusCard = buildCardViaPropertiesIfExist();
+  if (statusCard) {
+    return statusCard.build();
+  }
   var cardHeader = CardService.newCardHeader()  
     .setTitle("DriveWorks")
     .setSubtitle("Delete files")
@@ -457,8 +609,7 @@ function createDeleteFileCard(include_subfolder, dryrun) {
   var buttonSet = CardService.newButtonSet()
     .addButton(button);
   mainSection.addWidget(buttonSet);
-
-  var status = CardService.newDecoratedText().setText("File deletion progress is going to be shown in a spreadsheet once button is clicked. You will be notified via email once the job completes.").setWrapText(true).setTopLabel("File deletion status is shown below");
+  var status = CardService.newDecoratedText().setText("File deletion progress is going to be shown in a spreadsheet once button is clicked. You will be notified via email once the job completes.").setWrapText(true);  
   mainSection.addWidget(status);
 
   var card = CardService.newCardBuilder()
@@ -470,6 +621,10 @@ function createDeleteFileCard(include_subfolder, dryrun) {
 }
 
 function createDeleteFolderCard(include_subfolder, dryrun) {
+  var statusCard = buildCardViaPropertiesIfExist();
+  if (statusCard) {
+    return statusCard.build();
+  }
   var cardHeader = CardService.newCardHeader()  
     .setTitle("DriveWorks")
     .setSubtitle("Delete folders")
@@ -502,6 +657,7 @@ function createDeleteFolderCard(include_subfolder, dryrun) {
 
   var status = CardService.newDecoratedText().setText("Folder deletion progress is going to be shown in a spreadsheet once button is clicked. You will be notified via email once the job completes.").setWrapText(true).setTopLabel("Folder deletion status is shown below");
   mainSection.addWidget(status);
+
   var card = CardService.newCardBuilder()
     .setHeader(cardHeader)
     .addSection(paymentSection)
@@ -520,6 +676,10 @@ function changeFileRenameHandler(e) {
 }
 
 function createRenameFileCard(rename_method="rename_partial", include_subfolder, dryrun) {
+  var statusCard = buildCardViaPropertiesIfExist();
+  if (statusCard) {
+    return statusCard.build();
+  }
   var cardHeader = CardService.newCardHeader()  
     .setTitle("DriveWorks")
     .setSubtitle("Rename file")
@@ -611,6 +771,10 @@ function changeFolderRenameHandler(e) {
 }
 
 function createRenameFolderCard(rename_method="rename_partial", include_subfolder, dryrun) {
+  var statusCard = buildCardViaPropertiesIfExist();
+  if (statusCard) {
+    return statusCard.build();
+  }
   var cardHeader = CardService.newCardHeader()  
     .setTitle("DriveWorks")
     .setSubtitle("Rename folder")
@@ -752,7 +916,7 @@ function createHomeCard(item={}) {
   var dryrun = CardService.newSelectionInput()
     .setType(CardService.SelectionInputType.CHECK_BOX)
     .setFieldName("dryrun_field")
-    .addItem("Preview operations only without executing", "dryrun", true);
+    .addItem("Preview operations only without executing (dryrun)", "dryrun", true);
 
   var includeSubfolder = CardService.newSelectionInput()
     .setType(CardService.SelectionInputType.CHECK_BOX)
