@@ -1,10 +1,5 @@
 function onHomepage(e) {
   console.log('onHomePage = ' + JSON.stringify(e));
-  // var email = Session.getEffectiveUser().getEmail();
-  // var jobMetadataKey = getJobMetadataKey(email);
-  // var properties = PropertiesService.getUserProperties();
-  // properties.deleteProperty(jobMetadataKey);
-  // console.log('CLEAN UP STATUS');
   return createHomeCard();
 }
 
@@ -275,19 +270,6 @@ function iterateFolder(folder, operation, entity, include_subfolder, dryrun, del
   var startTime = (new Date()).getTime();
   var jobKey = getJobStatusKey(email);
   var properties = PropertiesService.getUserProperties();
-  // var jobMetadataKey = getJobMetadataKey(email);
-  // var metadata = {
-  //     folder: folder,
-  //     operation : operation, 
-  //     entity : entity,
-  //     include_subfolder : include_subfolder,
-  //     dryrun : dryrun,
-  //     delete_ops : delete_ops,
-  //     rename_ops : rename_ops
-  // };
-  // if (properties.getProperty(jobMetadataKey) === null) {
-  //   properties.setProperty(jobMetadataKey, JSON.stringify(metadata));
-  // }
   var iterationState = JSON.parse(properties.getProperty(jobKey));
   if (iterationState !== null) {
     if (folder.getName() !== iterationState[0].folderName) {
@@ -380,50 +362,6 @@ function deleteFileHandler(e) {
   return actionResponse.build();
 }
 
-/*
-  var operationType = CardService.newSelectionInput()
-    .setType(CardService.SelectionInputType.RADIO_BUTTON)
-    .setTitle("Select drive operation type")
-    .setFieldName("drive_operation_type_field")
-    .addItem("Delete", "delete", true)
-    .addItem("Rename", "rename", false);
-  var textStart = "Selected operation folder<br><b><font color='#065fd4'>";
-  var textEnd = "</font></b>"; 
-  if ('title' in item) {
-    var text = textStart + item.title + textEnd;
-  } else {
-    var text = textStart + "My Drive" + textEnd;
-  }
-  var selectedFolder = CardService.newDecoratedText().setText(text).setWrapText(true).setBottomLabel("Change by selecting a different folder");
-
-  var dryrun = CardService.newSelectionInput()
-    .setType(CardService.SelectionInputType.CHECK_BOX)
-    .setFieldName("dryrun_field")
-    .addItem("Preview operations only without executing", "dryrun", true);
-
-  var includeSubfolder = CardService.newSelectionInput()
-    .setType(CardService.SelectionInputType.CHECK_BOX)
-    .setFieldName("include_subfolders_field")
-    .addItem("Apply to subfolders", "include_subfolder", true);
-
-  var configureMoreAction = CardService.newAction()
-      .setFunctionName('configureMore');
-  var button = CardService.newTextButton()
-      .setText('Configure Details')
-      .setOnClickAction(configureMoreAction)
-      .setTextButtonStyle(CardService.TextButtonStyle.FILLED);
-  var buttonSet = CardService.newButtonSet()
-      .addButton(button);
-  var mainSection = CardService.newCardSection()
-    .addWidget(operationType)
-    .addWidget(entityType)
-    .addWidget(selectedFolder)
-    .addWidget(dryrun)
-    .addWidget(includeSubfolder)
-    .addWidget(buttonSet);
-
-*/
-
 function deleteJob() {
   var email = Session.getEffectiveUser().getEmail();
   var jobMetadataKey = getJobMetadataKey(email);
@@ -463,15 +401,6 @@ function buildCardViaPropertiesIfExist() {
     .addWidget(folderName)
     .addWidget(dryrun)
     .addWidget(include_subfolder);
-  // if (metadata.entity === "file") {
-  //   if (metadata.operation === "delete") {
-  //     var target_file_type = CardService.newDecoratedText().setText("Target file type: <b><font color='#065fd4'>" + metadata.delete_ops.file_type + "</b>");
-  //   } else {
-  //     var target_file_type = CardService.newDecoratedText().setText("Target file type: <b><font color='#065fd4'>" + metadata.rename_ops.file_type + "</b>");      
-  //   }
-  //   mainSection.addWidget(target_file_type);
-  // }
-
   var spreadsheet = SpreadsheetApp.openById(metadata.report_spreadsheet.id);
   var link = CardService.newOpenLink()
         .setUrl(spreadsheet.getUrl())
