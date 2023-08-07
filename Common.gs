@@ -785,6 +785,16 @@ function createRenameFolderCard(rename_method="rename_partial", include_subfolde
 
 function configureMore(e) {
   console.log('configureMore = ' + JSON.stringify(e));
+  var expire_time = getExpireTime();
+  if (expire_time!== -1 && expire_time <= Date.now()/1000) {
+    var card = getBuymoreCard();
+    var navigation = CardService.newNavigation()
+      .pushCard(card);
+    var actionResponse = CardService.newActionResponseBuilder()
+      .setNavigation(navigation);
+    return actionResponse.build();
+  }
+
   var operation_type = e.formInput.drive_operation_type_field;
   var entity_type = e.formInput.entity_type_field;
   var include_subfolder = e.formInput.include_subfolders_field === "include_subfolder";
@@ -809,10 +819,148 @@ function configureMore(e) {
   return actionResponse.build();
 }
 
+function getExpireTime(version=1) {
+  try {
+    var initial_days = 7;
+    var email = Session.getEffectiveUser().getEmail();
+    var key = email + version.toString();
+    var properties = PropertiesService.getScriptProperties();
+    var expire_time = properties.getProperty(key);
+    if (expire_time === null) {
+      var now = Date.now()/1000;
+      var future = now + initial_days*24*3600; 
+      expire_time = properties.setProperty(key, future.toString()).getProperty(key);
+    } 
+    console.log('expire_time = ' + expire_time);
+    var ret = parseInt(expire_time);
+    console.log('getExpireTime:' + key + ', initial_days = ' + initial_days + ', expire_time = ' + expire_time);
+    return ret;
+  } catch (e) {
+    console.log('getExpireTime error:' + e);
+    throw e;
+  }
+}
+
+function getRemainingDays() {
+  try {
+    var email = Session.getEffectiveUser().getEmail(); 
+    var expire_time = getExpireTime();
+    if (expire_time === -1) {
+      return -1;
+    }
+    var now = Date.now()/1000;
+    if (expire_time <= now) {
+      return 0;
+    }
+
+    var days = Math.ceil((expire_time - now) / (24*3600));
+    console.log('Email:' + email + ',remaining days = ' + days);
+    return days;
+  } catch (e) {
+    console.log('getRemainingDays error:' + e);
+    throw e;
+  }
+}
+
+function getBuymoreCard() {
+  var email = Session.getEffectiveUser().getEmail(); 
+  var cardHeader = CardService.newCardHeader()  
+    .setTitle("DriveWorks")
+    .setSubtitle("Buy More")
+    .setImageUrl(getLogoURL());
+  var mainSection = CardService.newCardSection().setHeader("Buy more days for app access");
+  var description = CardService.newDecoratedText().setText("To support users and add features, we are kindly asking to pay for its use. We hope you find the subscription price reasonable.").setWrapText(true);
+  mainSection.addWidget(description);
+
+  var options = CardService.newSelectionInput()
+    .setType(CardService.SelectionInputType.RADIO_BUTTON)
+    .setTitle("Select payment option")
+    .setFieldName("payment_option_field")
+    .addItem("$5 per month (billed per month)", "month", false)
+    .addItem("$50 per year (billed per year)", "year", true);
+  mainSection.addWidget(options);
+
+  var link = CardService.newOpenLink()
+        .setUrl("https://www.paypal.com/paypalme/SmartGAS888")
+        .setOpenAs(CardService.OpenAs.FULL_SIZE)
+        .setOnClose(CardService.OnClose.RELOAD_ADD_ON)
+  var paymethod = CardService.newDecoratedText().setText("Please <b><font color='#065fd4'>CLICK HERE</font></b> to pay and send an email to james.cui.code@gmail.com after the payment to update your access.").setWrapText(true).setOpenLink(link);
+  mainSection.addWidget(paymethod);
+
+  if (email === "james.cui.code@gmail.com") {
+    var email_account = CardService.newTextInput()
+      .setFieldName("email_field")
+      .setTitle("Email account");
+    var added_days = CardService.newTextInput()
+      .setFieldName("added_days")
+      .setTitle("Days");
+    mainSection.addWidget(email_account).addWidget(added_days);
+    var setDaysAction = CardService.newAction().setMethodName("setDays")
+    var button = CardService.newTextButton()
+      .setText('Set Days')
+      .setOnClickAction(setDaysAction)
+      .setTextButtonStyle(CardService.TextButtonStyle.FILLED);
+    var buttonSet = CardService.newButtonSet()
+      .addButton(button);
+    mainSection.addWidget(buttonSet);
+  }
+
+  var card = CardService.newCardBuilder()
+    .setHeader(cardHeader)
+    .addSection(mainSection);
+
+  return card.build();  
+}
+
+/*
+formInput: 
+   { added_days: '10',
+     email_field: 'james.cui.code@gmail.com',
+     payment_option_field: 'year' },
+*/
+
+function setDays(e) {
+  var email = e.formInput.email_field;
+  var days = parseInt(e.formInput.added_days);
+  setExpiredTime(email, 1, days);
+}
+
+function setExpiredTime(user, version, days) {
+  try {
+    var key = user + version.toString();
+    var properties = PropertiesService.getScriptProperties();
+    if (days === -1) {
+      properties.setProperty(key, "-1");
+      return -1;
+    }
+    var expire_time = properties.getProperty(key);
+    var now = Date.now()/1000;
+    var future = now + days*24*3600; 
+    expire_time = properties.setProperty(key, future.toString()).getProperty(key);
+    var ret = parseInt(expire_time);
+    console.log('setExpiredTime: key = ' + key + ', expire_time = ' + expire_time);
+    return ret;
+  } catch (e) {
+    console.log('setExpiredTime error:' + e);
+    return -1;
+  }
+}
+
+function buymore() {
+  var card = getBuymoreCard();
+  var navigation = CardService.newNavigation()
+      .pushCard(card);
+  var actionResponse = CardService.newActionResponseBuilder()
+      .setNavigation(navigation);
+  return actionResponse.build();
+}
+
 function getPaymentSection() {
   var endIcon = CardService.newIconImage().setIcon(CardService.Icon.VIDEO_PLAY);
   var buymoreIcon = CardService.newIconImage().setIcon(CardService.Icon.DOLLAR);
-  var buymore = CardService.newDecoratedText().setText("Remaining 7 days for trial").setStartIcon(buymoreIcon).setEndIcon(endIcon).setWrapText(true);
+  var remainDays = getRemainingDays();
+  var action = CardService.newAction().setFunctionName('buymore');
+  var buymore = CardService.newDecoratedText().setText("Remaining <b><font color='#065fd4'>" + remainDays + " days</font></b> for trial").setStartIcon(buymoreIcon).setEndIcon(endIcon).setWrapText(true).setOnClickAction(action);
   return CardService.newCardSection().addWidget(buymore);  
 }
 
