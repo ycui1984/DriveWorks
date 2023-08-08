@@ -880,12 +880,19 @@ function getBuymoreCard() {
     .addItem("$50 per year (billed per year)", "year", true);
   mainSection.addWidget(options);
 
-  var link = CardService.newOpenLink()
+  var paypalLink = CardService.newOpenLink()
         .setUrl("https://www.paypal.com/paypalme/SmartGAS888")
         .setOpenAs(CardService.OpenAs.FULL_SIZE)
+        .setOnClose(CardService.OnClose.RELOAD_ADD_ON);
+  var paypal = CardService.newDecoratedText().setText("Option1 (PayPal): Please use <b><font color='#065fd4'>PayPal</font></b> and send an email to james.cui.code@gmail.com after the payment to update your access.").setWrapText(true).setOpenLink(paypalLink);
+  mainSection.addWidget(paypal);
+
+  var buycoffeelink = CardService.newOpenLink()
+        .setUrl("https://www.buymeacoffee.com/smartgas")
+        .setOpenAs(CardService.OpenAs.FULL_SIZE)
         .setOnClose(CardService.OnClose.RELOAD_ADD_ON)
-  var paymethod = CardService.newDecoratedText().setText("Please <b><font color='#065fd4'>CLICK HERE</font></b> to pay and send an email to james.cui.code@gmail.com after the payment to update your access.").setWrapText(true).setOpenLink(link);
-  mainSection.addWidget(paymethod);
+  var buycoffee = CardService.newDecoratedText().setText("Option2 (Buy Me A Coffee): Please use <b><font color='#065fd4'>Buy me a coffee</font></b> and send an email to james.cui.code@gmail.com after the payment to update your access.").setWrapText(true).setOpenLink(buycoffeelink);
+  mainSection.addWidget(buycoffee);
 
   if (email === "james.cui.code@gmail.com") {
     var email_account = CardService.newTextInput()
