@@ -3,30 +3,36 @@ function onHomepage(e) {
   return createHomeCard();
 }
 
-function applyDeleteOnFile(file, dryrun, delete_ops) {
+function applyDeleteOnFile(file, dryrun, delete_ops, include_subfolder, sheet) {
   var matchStr = getMatchStr(delete_ops);
-  if (matchStr === null || file.getName().includes(matchStr)) {
+  var fileName = file.getName();
+  if (matchStr === null || fileName.includes(matchStr)) {
     if (dryrun) {
-      console.log('Deleting file ' + file.getName());
+      console.log('Deleting file ' + fileName);
+      sheet.appendRow(["File", "Delete", "Yes", include_subfolder, fileName])
       return;
     }
 
+    sheet.appendRow(["File", "Delete", "No", include_subfolder, fileName])
     file.setTrashed(true);
   }
 }
 
-function applyDeleteOnFolder(folder, dryrun, delete_ops) {
+function applyDeleteOnFolder(folder, dryrun, delete_ops, include_subfolder, sheet) {
   var matchStr = getMatchStr(delete_ops);
   var notEmpty = folder.getFiles().hasNext();
-  if (matchStr === null || folder.getName().includes(matchStr)) {
+  var folderName = folder.getName();
+  if (matchStr === null || folderName.includes(matchStr)) {
     if (delete_ops.delete_empty_folder) {
       if (notEmpty) return;
     }
     if (dryrun) {
-      console.log('Deleting folder ' + folder.getName());
+      sheet.appendRow(["Folder", "Delete", "Yes", include_subfolder, folderName])
+      console.log('Deleting folder ' + folderName);
       return;
     }
 
+    sheet.appendRow(["Folder", "Delete", "No", include_subfolder, folderName])
     folder.setTrashed(true);
   }
 }
@@ -48,33 +54,39 @@ function getNewName(name, rename_ops) {
   throw "Unsupported rename ops = " + rename_ops.rename_method;  
 }
 
-function applyRenameOnFile(file, dryrun, rename_ops) {
+function applyRenameOnFile(file, dryrun, rename_ops, include_subfolder, sheet) {
   var matchStr = getMatchStr(rename_ops);
-  if (matchStr === null || file.getName().includes(matchStr)) {
-    var new_name = getNewName(file.getName(), rename_ops);
+  var fileName = file.getName();
+  if (matchStr === null || fileName.includes(matchStr)) {
+    var new_name = getNewName(fileName, rename_ops);
     if (dryrun) {
-      console.log('Renaming file ' + file.getName() + ' into new name = ' + new_name);
+      sheet.appendRow(["File", "Rename", "Yes", include_subfolder, fileName])
+      console.log('Renaming file ' + fileName + ' into new name = ' + new_name);
       return;
     }
 
+    sheet.appendRow(["File", "Rename", "No", include_subfolder, fileName])
     file.setName(new_name);
   }
 }
 
-function applyRenameOnFolder(folder, dryrun, rename_ops) {
+function applyRenameOnFolder(folder, dryrun, rename_ops, include_subfolder, sheet) {
   var matchStr = getMatchStr(rename_ops);
-  if (matchStr === null || folder.getName().includes(matchStr)) {
-    var new_name = getNewName(folder.getName(), rename_ops);
+  var folderName = folder.getName();
+  if (matchStr === null || folderName.includes(matchStr)) {
+    var new_name = getNewName(folderName, rename_ops);
     if (dryrun) {
-      console.log('Renaming folder ' + folder.getName() + ' into new name = ' + new_name);
+      sheet.appendRow(["Folder", "Rename", "Yes", include_subfolder, folderName])
+      console.log('Renaming folder ' + folderName + ' into new name = ' + new_name);
       return;
     }
 
+    sheet.appendRow(["Folder", "Rename", "No", include_subfolder, folderName])
     folder.setName(new_name);  
   }
 }
 
-function nextIteration(iterationState, operation, entity, include_subfolder, dryrun, delete_ops, rename_ops) {
+function nextIteration(iterationState, operation, entity, include_subfolder, dryrun, delete_ops, rename_ops, sheet) {
   var currentIteration = iterationState[iterationState.length-1];
   if (currentIteration.fileIteratorContinuationToken !== null) {
     var fileIterator = DriveApp.continueFileIterator(currentIteration.fileIteratorContinuationToken);
@@ -82,9 +94,9 @@ function nextIteration(iterationState, operation, entity, include_subfolder, dry
       var file = fileIterator.next();
       if (entity === "file") {
         if (operation === "delete") {
-          applyDeleteOnFile(file, dryrun, delete_ops);
+          applyDeleteOnFile(file, dryrun, delete_ops, include_subfolder, sheet);
         } else if (operation === "rename") {
-          applyRenameOnFile(file, dryrun, rename_ops);
+          applyRenameOnFile(file, dryrun, rename_ops, include_subfolder, sheet);
         } else {
           throw "nextIteration: Unsupported operation type for file = " + operation;
         }
@@ -105,9 +117,9 @@ function nextIteration(iterationState, operation, entity, include_subfolder, dry
       var folder = folderIterator.next();
       if (entity === "folder") {
         if (operation === "delete") {
-          applyDeleteOnFolder(folder, dryrun, delete_ops);
+          applyDeleteOnFolder(folder, dryrun, delete_ops, include_subfolder, sheet);
         } else if (operation === "rename") {
-          applyRenameOnFolder(folder, dryrun, rename_ops);
+          applyRenameOnFolder(folder, dryrun, rename_ops, include_subfolder, sheet);
         } else {
           throw "nextIteration: Unsupported operation type for folder = " + operation;
         }
@@ -256,14 +268,17 @@ function onScheduledRun(e) {
 
   var json = JSON.parse(metadata);
   var folder = DriveApp.getFolderById(json.folder.id);
-  iterateFolder(folder, json.operation, json.entity, json.include_subfolder, json.dry_run, json.delete_ops, json.rename_ops);
+  var spreadsheet = SpreadsheetApp.openById(json.report_spreadsheet.id);
+  var sheet = spreadsheet.getSheetByName(getOperationLogSheetName());
+  var progress = spreadsheet.getSheetByName()
+  iterateFolder(folder, json.operation, json.entity, json.include_subfolder, json.dry_run, json.delete_ops, json.rename_ops, sheet, progress);
   var trigger = findTrigger(triggerId);
   if (trigger !== null) {
     ScriptApp.deleteTrigger(trigger);
   }
 }
 
-function iterateFolder(folder, operation, entity, include_subfolder, dryrun, delete_ops, rename_ops) {
+function iterateFolder(folder, operation, entity, include_subfolder, dryrun, delete_ops, rename_ops, sheet, progress) {
   var email = Session.getEffectiveUser().getEmail();
   console.log('Iterate entity in folder: email = ' + email + ', folder = ' + folder + ', operation = ' + operation + ', entity = ' + entity + ', include_subfolder = ' + include_subfolder + ', dryrun = ' + dryrun + ', delete_ops = ' + JSON.stringify(delete_ops) + ', rename_ops = ' + JSON.stringify(rename_ops));
   var MAX_RUNNING_TIME_MS = 4.5 * 60 * 1000;
@@ -280,18 +295,21 @@ function iterateFolder(folder, operation, entity, include_subfolder, dryrun, del
   }
   if (iterationState === null) {
     console.info("Starting new iteration for folder: " + folder.getName());
+    progress.appendRow([(new Date()).getTime(), "STARTED"]);
     iterationState = [];
     iterationState.push(makeIterationFromFolder(folder, operation, entity, delete_ops, rename_ops));
   }  
 
+  progress.appendRow([(new Date()).getTime(), "STARTED NEW ITERATION"]);
   while (iterationState.length > 0) {
-    iterationState = nextIteration(iterationState, operation, entity, include_subfolder, dryrun, delete_ops, rename_ops);
+    iterationState = nextIteration(iterationState, operation, entity, include_subfolder, dryrun, delete_ops, rename_ops, sheet);
     var currTime = (new Date()).getTime();
     var elapsedTimeInMS = currTime - startTime;
     var timeLimitExceeded = elapsedTimeInMS >= MAX_RUNNING_TIME_MS;
     if (timeLimitExceeded) {
       properties.setProperty(jobKey, JSON.stringify(iterationState));
       console.info("Stopping loop after '%d' milliseconds.", elapsedTimeInMS);
+      progress.appendRow([(new Date()).getTime(), "ENDED NEW ITERATION"]);
       // Continue work after 1s
       ScriptApp.newTrigger("onScheduledRun").timeBased().after(1000).create();
       return;
@@ -299,6 +317,7 @@ function iterateFolder(folder, operation, entity, include_subfolder, dryrun, del
   }
 
   console.info("Done iterating. Deleting iterating state ... ");
+  progress.appendRow([(new Date()).getTime(), "DONE"]);
   properties.deleteProperty(jobKey);
   properties.deleteProperty(jobMetadataKey);
 }
@@ -318,6 +337,14 @@ function parseFolderFromEvent(e) {
   return folder;
 }
 
+function getOperationLogSheetName() {
+  return "Operation Logs";
+}
+
+function getProgressSheetName() {
+  return "Progress";
+}
+
 function deleteFileHandler(e) {
   console.log('deleteFileHandler = ' + JSON.stringify(e));
   var email = Session.getEffectiveUser().getEmail();
@@ -333,6 +360,10 @@ function deleteFileHandler(e) {
   var properties = PropertiesService.getUserProperties();
   var jobMetadataKey = getJobMetadataKey(email);
   var spreadsheet = SpreadsheetApp.create("DriveWorks_progress_report_" + Date.now());
+  var sheet = spreadsheet.insertSheet(getOperationLogSheetName());
+  sheet.appendRow(["Entity", "Operation", "Dry run", "Include subfolder", "Entity name"]);
+  var progress = spreadsheet.insertSheet(getProgressSheetName());
+  progress.appendRow(["Time", "Progress"]);
   var metadata = {
       folder: {
         id: folder.getId(),
@@ -435,9 +466,43 @@ function deleteFolderHandler(e) {
     search: foldername_match,
     delete_empty_folder: delete_empty_folder,
   }
+  var email = Session.getEffectiveUser().getEmail();
   var dryrun = JSON.parse(e.parameters.dryrun);
   var include_subfolder = JSON.parse(e.parameters.include_subfolder);
-  iterateFolder(folder, "delete", "folder", include_subfolder, dryrun, delete_ops, null);
+  var properties = PropertiesService.getUserProperties();
+  var jobMetadataKey = getJobMetadataKey(email);
+  var spreadsheet = SpreadsheetApp.create("DriveWorks_progress_report_" + Date.now());
+  var sheet = spreadsheet.insertSheet(getOperationLogSheetName());
+  sheet.appendRow(["Entity", "Operation", "Dry run", "Include subfolder", "Entity name"]);
+  var progress = spreadsheet.insertSheet(getProgressSheetName());
+  progress.appendRow(["Time", "Progress"]);
+  var metadata = {
+      folder: {
+        id: folder.getId(),
+        name: folder.getName()
+      },
+      operation : "delete", 
+      entity : "folder",
+      include_subfolder : include_subfolder,
+      dry_run : dryrun,
+      delete_ops : delete_ops,
+      rename_ops : null,
+      report_spreadsheet : {
+        id : spreadsheet.getId(),
+        name: spreadsheet.getName()
+      }
+  };
+  if (properties.getProperty(jobMetadataKey) === null) {
+    properties.setProperty(jobMetadataKey, JSON.stringify(metadata));
+  } else {
+    console.log('job metadata key exists, but it should not, the key =' + jobMetadataKey);
+  }
+  ScriptApp.newTrigger("onScheduledRun").timeBased().after(1000).create();
+  var card = createDeleteFolderCard(include_subfolder, dryrun);
+  var navigation = CardService.newNavigation().updateCard(card);
+  var actionResponse = CardService.newActionResponseBuilder()
+      .setNavigation(navigation);
+  return actionResponse.build();
 }
 
 function renameFileHandler(e) {
@@ -452,7 +517,44 @@ function renameFileHandler(e) {
     before: ("file_name_before_field" in e.formInput)? e.formInput.file_name_before_field: null,
     after: ("file_name_after_field" in e.formInput)? e.formInput.file_name_after_field : null,
   }
-  iterateFolder(folder, "rename", "file", JSON.parse(e.parameters.include_subfolder), JSON.parse(e.parameters.dryrun), null, rename_ops);
+  
+  var email = Session.getEffectiveUser().getEmail();
+  var dryrun = JSON.parse(e.parameters.dryrun);
+  var include_subfolder = JSON.parse(e.parameters.include_subfolder);
+  var properties = PropertiesService.getUserProperties();
+  var jobMetadataKey = getJobMetadataKey(email);
+  var spreadsheet = SpreadsheetApp.create("DriveWorks_progress_report_" + Date.now());
+  var sheet = spreadsheet.insertSheet(getOperationLogSheetName());
+  sheet.appendRow(["Entity", "Operation", "Dry run", "Include subfolder", "Entity name"]);
+  var progress = spreadsheet.insertSheet(getProgressSheetName());
+  progress.appendRow(["Time", "Progress"]);
+  var metadata = {
+      folder: {
+        id: folder.getId(),
+        name: folder.getName()
+      },
+      operation : "rename", 
+      entity : "file",
+      include_subfolder : include_subfolder,
+      dry_run : dryrun,
+      delete_ops : null,
+      rename_ops : rename_ops,
+      report_spreadsheet : {
+        id : spreadsheet.getId(),
+        name: spreadsheet.getName()
+      }
+  };
+  if (properties.getProperty(jobMetadataKey) === null) {
+    properties.setProperty(jobMetadataKey, JSON.stringify(metadata));
+  } else {
+    console.log('job metadata key exists, but it should not, the key =' + jobMetadataKey);
+  }
+  ScriptApp.newTrigger("onScheduledRun").timeBased().after(1000).create();
+  var card = createRenameFileCard(e.formInput.rename_method_field, include_subfolder, dryrun);
+  var navigation = CardService.newNavigation().updateCard(card);
+  var actionResponse = CardService.newActionResponseBuilder()
+      .setNavigation(navigation);
+  return actionResponse.build();
 }
 
 function renameFolderHandler(e) {
@@ -467,7 +569,44 @@ function renameFolderHandler(e) {
     before: ("folder_name_before_field" in e.formInput)? e.formInput.folder_name_before_field: null,
     after: ("folder_name_after_field" in e.formInput)? e.formInput.folder_name_after_field : null,
   }
-  iterateFolder(folder, "rename", "folder", JSON.parse(e.parameters.include_subfolder), JSON.parse(e.parameters.dryrun), null, rename_ops);
+  var email = Session.getEffectiveUser().getEmail();
+  var dryrun = JSON.parse(e.parameters.dryrun);
+  var include_subfolder = JSON.parse(e.parameters.include_subfolder);
+  var properties = PropertiesService.getUserProperties();
+  var jobMetadataKey = getJobMetadataKey(email);
+  var spreadsheet = SpreadsheetApp.create("DriveWorks_progress_report_" + Date.now());
+  var sheet = spreadsheet.insertSheet(getOperationLogSheetName());
+  sheet.appendRow(["Entity", "Operation", "Dry run", "Include subfolder", "Entity name"]);
+  var progress = spreadsheet.insertSheet(getProgressSheetName());
+  progress.appendRow(["Time", "Progress"]);
+  spreadsheet.deleteSheet(spreadsheet.getSheetByName('Sheet1'));
+  var metadata = {
+      folder: {
+        id: folder.getId(),
+        name: folder.getName()
+      },
+      operation : "rename", 
+      entity : "folder",
+      include_subfolder : include_subfolder,
+      dry_run : dryrun,
+      delete_ops : null,
+      rename_ops : rename_ops,
+      report_spreadsheet : {
+        id : spreadsheet.getId(),
+        name: spreadsheet.getName()
+      }
+  };
+  if (properties.getProperty(jobMetadataKey) === null) {
+    properties.setProperty(jobMetadataKey, JSON.stringify(metadata));
+  } else {
+    console.log('job metadata key exists, but it should not, the key =' + jobMetadataKey);
+  }
+  ScriptApp.newTrigger("onScheduledRun").timeBased().after(1000).create();
+  var card = createRenameFolderCard(e.formInput.rename_method_field, include_subfolder, dryrun);
+  var navigation = CardService.newNavigation().updateCard(card);
+  var actionResponse = CardService.newActionResponseBuilder()
+      .setNavigation(navigation);
+  return actionResponse.build();
 }
 
 function getFileTypeWidget() {
