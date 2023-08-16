@@ -16,7 +16,7 @@
   "addOns": {
     "common": {
       "name": "DriveWorks",
-      "logoUrl": "https://lh3.googleusercontent.com/drive-viewer/AITFw-yAbBqZJMHtHd8akkZr8Ri1KrpInZoT1671AEt1x4enG_OOOFrP8_-4rvMbb3oU6jzVIBOF1FFRNAWdE3F0V6hxbydf=s2560",
+      "logoUrl": "https://lh3.googleusercontent.com/drive-viewer/AITFw-zu7mbXSjMUVB7IkDIi6qamFyJDaArrEIOeOYo5Y29rfilhSMuUDEzp0OtuLzGsyM9wRxRLxfgyQkOYuo5-50xhoARX=s2560",
       "useLocaleFromApp": true,
       "homepageTrigger": {
         "runFunction": "onHomepage",
