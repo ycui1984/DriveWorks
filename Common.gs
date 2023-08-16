@@ -310,23 +310,15 @@ function iterateFolder(folder, operation, entity, include_subfolder, dryrun, del
       properties.setProperty(jobKey, JSON.stringify(iterationState));
       console.info("Stopping loop after '%d' milliseconds.", elapsedTimeInMS);
       progress.appendRow([(new Date()).getTime(), "ENDED NEW ITERATION"]);
-      // Continue work after 1s
-      ScriptApp.newTrigger("onScheduledRun").timeBased().after(1000).create();
       return;
     }
   }
   
-  /*
-  Stopping loop after '270534' milliseconds.
-  Exception: Clock events must be scheduled at least 1 hour(s) apart.
-    at iterateFolder(Common:314:70)
-    at onScheduledRun(Common:274:3)
-  */
-
   console.info("Done iterating. Deleting iterating state ... ");
   progress.appendRow([(new Date()).getTime(), "DONE"]);
   properties.deleteProperty(jobKey);
   properties.deleteProperty(jobMetadataKey);
+  // TODO: delete trigger
 }
 
 
@@ -399,7 +391,7 @@ function deleteFileHandler(e) {
   var dryrun = JSON.parse(e.parameters.dryrun);
   var include_subfolder = JSON.parse(e.parameters.include_subfolder);
   setMetadata(folder, "delete", "file", dryrun, include_subfolder, delete_ops, null);
-  ScriptApp.newTrigger("onScheduledRun").timeBased().after(1000).create();
+  ScriptApp.newTrigger("onScheduledRun").timeBased().everyMinutes(5).create();
   var card = createDeleteFileCard(include_subfolder, dryrun);
   var navigation = CardService.newNavigation().updateCard(card);
   var actionResponse = CardService.newActionResponseBuilder()
@@ -483,7 +475,7 @@ function deleteFolderHandler(e) {
   var dryrun = JSON.parse(e.parameters.dryrun);
   var include_subfolder = JSON.parse(e.parameters.include_subfolder);
   setMetadata(folder, "delete", "folder", dryrun, include_subfolder, delete_ops, null);
-  ScriptApp.newTrigger("onScheduledRun").timeBased().after(1000).create();
+  ScriptApp.newTrigger("onScheduledRun").timeBased().everyMinutes(5).create();
   var card = createDeleteFolderCard(include_subfolder, dryrun);
   var navigation = CardService.newNavigation().updateCard(card);
   var actionResponse = CardService.newActionResponseBuilder()
@@ -508,7 +500,7 @@ function renameFileHandler(e) {
   var dryrun = JSON.parse(e.parameters.dryrun);
   var include_subfolder = JSON.parse(e.parameters.include_subfolder);
   setMetadata(folder, "rename", "file", dryrun, include_subfolder, null, rename_ops);
-  ScriptApp.newTrigger("onScheduledRun").timeBased().after(1000).create();
+  ScriptApp.newTrigger("onScheduledRun").timeBased().everyMinutes(5).create();
   var card = createRenameFileCard(e.formInput.rename_method_field, include_subfolder, dryrun);
   var navigation = CardService.newNavigation().updateCard(card);
   var actionResponse = CardService.newActionResponseBuilder()
@@ -531,7 +523,7 @@ function renameFolderHandler(e) {
   var dryrun = JSON.parse(e.parameters.dryrun);
   var include_subfolder = JSON.parse(e.parameters.include_subfolder);
   setMetadata(folder, "rename", "folder", dryrun, include_subfolder, null, rename_ops);
-  ScriptApp.newTrigger("onScheduledRun").timeBased().after(1000).create();
+  ScriptApp.newTrigger("onScheduledRun").timeBased().everyMinutes(5).create();
   var card = createRenameFolderCard(e.formInput.rename_method_field, include_subfolder, dryrun);
   var navigation = CardService.newNavigation().updateCard(card);
   var actionResponse = CardService.newActionResponseBuilder()
