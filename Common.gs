@@ -244,6 +244,14 @@ function getJobMetadataKey(email) {
   return email + ":metadata";
 }
 
+function deleteAllTriggersForUser() {
+  // NOTE: getProjectTrigger() only list out triggers for CURRENT USER
+  var triggers = ScriptApp.getProjectTriggers();
+  for (var i = 0; i < triggers.length; i++) {
+    ScriptApp.deleteTrigger(triggers[i]);
+  }
+}
+
 function findTrigger(id) {
   console.log('findTrigger: finding trigger with id = ' + id);
   var triggers = ScriptApp.getProjectTriggers();
@@ -256,7 +264,7 @@ function findTrigger(id) {
 }
 
 function onScheduledRun(e) {
-  var triggerId = e.triggerUid.toString();
+  //var triggerId = e.triggerUid.toString();
   var email = Session.getEffectiveUser().getEmail();
   var jobMetadataKey = getJobMetadataKey(email);
   var properties = PropertiesService.getUserProperties();
@@ -271,11 +279,12 @@ function onScheduledRun(e) {
   var spreadsheet = SpreadsheetApp.openById(json.report_spreadsheet.id);
   var sheet = spreadsheet.getSheetByName(getOperationLogSheetName());
   var progress = spreadsheet.getSheetByName(getProgressSheetName());
+  // var trigger = findTrigger(triggerId);
+  // if (trigger !== null) {
+  //   console.log('Found and deleting trigger XXXX');
+  //   ScriptApp.deleteTrigger(trigger);
+  // }
   iterateFolder(folder, json.operation, json.entity, json.include_subfolder, json.dry_run, json.delete_ops, json.rename_ops, sheet, progress);
-  var trigger = findTrigger(triggerId);
-  if (trigger !== null) {
-    ScriptApp.deleteTrigger(trigger);
-  }
 }
 
 function iterateFolder(folder, operation, entity, include_subfolder, dryrun, delete_ops, rename_ops, sheet, progress) {
@@ -284,6 +293,7 @@ function iterateFolder(folder, operation, entity, include_subfolder, dryrun, del
   var MAX_RUNNING_TIME_MS = 4.5 * 60 * 1000;
   var startTime = (new Date()).getTime();
   var jobKey = getJobStatusKey(email);
+  var jobMetadataKey = getJobMetadataKey(email);
   var properties = PropertiesService.getUserProperties();
   var iterationState = JSON.parse(properties.getProperty(jobKey));
   if (iterationState !== null) {
@@ -318,7 +328,7 @@ function iterateFolder(folder, operation, entity, include_subfolder, dryrun, del
   progress.appendRow([(new Date()).getTime(), "DONE"]);
   properties.deleteProperty(jobKey);
   properties.deleteProperty(jobMetadataKey);
-  // TODO: delete trigger
+  deleteAllTriggersForUser();
 }
 
 
@@ -379,6 +389,87 @@ function setMetadata(folder, operation, entity, dryrun, include_subfolder, delet
   }
 }
 
+function onScheduledRunNear0(e) {
+  var email = Session.getEffectiveUser().getEmail();
+  console.log('onScheduledRunNear0 for email = ' + email);
+  return onScheduledRun(e);
+}
+
+function onScheduledRunNear5(e) {
+  var email = Session.getEffectiveUser().getEmail();
+  console.log('onScheduledRunNear5 for email = ' + email);
+  return onScheduledRun(e);
+}
+
+function onScheduledRunNear10(e) {
+  var email = Session.getEffectiveUser().getEmail();
+  console.log('onScheduledRunNear10 for email = ' + email);
+  return onScheduledRun(e);
+}
+
+function onScheduledRunNear15(e) {
+  var email = Session.getEffectiveUser().getEmail();
+  console.log('onScheduledRunNear15 for email = ' + email);
+  return onScheduledRun(e);
+}
+
+function onScheduledRunNear20(e) {
+  var email = Session.getEffectiveUser().getEmail();
+  console.log('onScheduledRunNear20 for email = ' + email);
+  return onScheduledRun(e);
+}
+
+function onScheduledRunNear25(e) {
+  var email = Session.getEffectiveUser().getEmail();
+  console.log('onScheduledRunNear25 for email = ' + email);
+  return onScheduledRun(e);
+}
+
+function onScheduledRunNear30(e) {
+  var email = Session.getEffectiveUser().getEmail();
+  console.log('onScheduledRunNear30 for email = ' + email);
+  return onScheduledRun(e);
+}
+
+function onScheduledRunNear35(e) {
+  var email = Session.getEffectiveUser().getEmail();
+  console.log('onScheduledRunNear35 for email = ' + email);
+  return onScheduledRun(e);
+}
+
+function onScheduledRunNear40(e) {
+  var email = Session.getEffectiveUser().getEmail();
+  console.log('onScheduledRunNear40 for email = ' + email);
+  return onScheduledRun(e);
+}
+
+function onScheduledRunNear45(e) {
+  var email = Session.getEffectiveUser().getEmail();
+  console.log('onScheduledRunNear45 for email = ' + email);
+  return onScheduledRun(e);
+}
+
+function onScheduledRunNear50(e) {
+  var email = Session.getEffectiveUser().getEmail();
+  console.log('onScheduledRunNear50 for email = ' + email);
+  return onScheduledRun(e);
+}
+
+function onScheduledRunNear55(e) {
+  var email = Session.getEffectiveUser().getEmail();
+  console.log('onScheduledRunNear55 for email = ' + email);
+  return onScheduledRun(e);
+}
+
+function installTriggersForUsers() {
+  var email = Session.getEffectiveUser().getEmail();
+  deleteAllTriggersForUser();
+  for (var i = 0; i < 60; i+= 5) {
+    console.log('installTriggersForUsers: email = ' + email + ', near min = ' + i);
+    ScriptApp.newTrigger("onScheduledRunNear" + i.toString()).timeBased().everyHours(1).nearMinute(i).create();
+  }
+}
+
 function deleteFileHandler(e) {
   console.log('deleteFileHandler = ' + JSON.stringify(e));
   var folder = parseFolderFromEvent(e);
@@ -391,7 +482,7 @@ function deleteFileHandler(e) {
   var dryrun = JSON.parse(e.parameters.dryrun);
   var include_subfolder = JSON.parse(e.parameters.include_subfolder);
   setMetadata(folder, "delete", "file", dryrun, include_subfolder, delete_ops, null);
-  ScriptApp.newTrigger("onScheduledRun").timeBased().everyMinutes(5).create();
+  installTriggersForUsers();
   var card = createDeleteFileCard(include_subfolder, dryrun);
   var navigation = CardService.newNavigation().updateCard(card);
   var actionResponse = CardService.newActionResponseBuilder()
@@ -475,7 +566,7 @@ function deleteFolderHandler(e) {
   var dryrun = JSON.parse(e.parameters.dryrun);
   var include_subfolder = JSON.parse(e.parameters.include_subfolder);
   setMetadata(folder, "delete", "folder", dryrun, include_subfolder, delete_ops, null);
-  ScriptApp.newTrigger("onScheduledRun").timeBased().everyMinutes(5).create();
+  installTriggersForUsers();
   var card = createDeleteFolderCard(include_subfolder, dryrun);
   var navigation = CardService.newNavigation().updateCard(card);
   var actionResponse = CardService.newActionResponseBuilder()
@@ -496,11 +587,10 @@ function renameFileHandler(e) {
     after: ("file_name_after_field" in e.formInput)? e.formInput.file_name_after_field : null,
   }
   
-  var email = Session.getEffectiveUser().getEmail();
   var dryrun = JSON.parse(e.parameters.dryrun);
   var include_subfolder = JSON.parse(e.parameters.include_subfolder);
   setMetadata(folder, "rename", "file", dryrun, include_subfolder, null, rename_ops);
-  ScriptApp.newTrigger("onScheduledRun").timeBased().everyMinutes(5).create();
+  installTriggersForUsers();
   var card = createRenameFileCard(e.formInput.rename_method_field, include_subfolder, dryrun);
   var navigation = CardService.newNavigation().updateCard(card);
   var actionResponse = CardService.newActionResponseBuilder()
@@ -523,7 +613,7 @@ function renameFolderHandler(e) {
   var dryrun = JSON.parse(e.parameters.dryrun);
   var include_subfolder = JSON.parse(e.parameters.include_subfolder);
   setMetadata(folder, "rename", "folder", dryrun, include_subfolder, null, rename_ops);
-  ScriptApp.newTrigger("onScheduledRun").timeBased().everyMinutes(5).create();
+  installTriggersForUsers();
   var card = createRenameFolderCard(e.formInput.rename_method_field, include_subfolder, dryrun);
   var navigation = CardService.newNavigation().updateCard(card);
   var actionResponse = CardService.newActionResponseBuilder()
