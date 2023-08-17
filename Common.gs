@@ -252,19 +252,7 @@ function deleteAllTriggersForUser() {
   }
 }
 
-function findTrigger(id) {
-  console.log('findTrigger: finding trigger with id = ' + id);
-  var triggers = ScriptApp.getProjectTriggers();
-  for (var i = 0; i < triggers.length; i++) {
-    if (triggers[i].getUniqueId().toString() === id) {
-      return triggers[i];
-    }
-  }
-  return null;
-}
-
 function onScheduledRun(e) {
-  //var triggerId = e.triggerUid.toString();
   var email = Session.getEffectiveUser().getEmail();
   var jobMetadataKey = getJobMetadataKey(email);
   var properties = PropertiesService.getUserProperties();
@@ -279,11 +267,6 @@ function onScheduledRun(e) {
   var spreadsheet = SpreadsheetApp.openById(json.report_spreadsheet.id);
   var sheet = spreadsheet.getSheetByName(getOperationLogSheetName());
   var progress = spreadsheet.getSheetByName(getProgressSheetName());
-  // var trigger = findTrigger(triggerId);
-  // if (trigger !== null) {
-  //   console.log('Found and deleting trigger XXXX');
-  //   ScriptApp.deleteTrigger(trigger);
-  // }
   iterateFolder(folder, json.operation, json.entity, json.include_subfolder, json.dry_run, json.delete_ops, json.rename_ops, sheet, progress);
 }
 
