@@ -252,6 +252,10 @@ function deleteAllTriggersForUser() {
   }
 }
 
+function getLockKey(email) {
+  return email + "lock";
+}
+
 function onScheduledRun(e) {
   var email = Session.getEffectiveUser().getEmail();
   var jobMetadataKey = getJobMetadataKey(email);
@@ -262,23 +266,38 @@ function onScheduledRun(e) {
     return;
   }
 
+  var lockVal = properties.getProperty(getLockKey(email));
+  if (lockVal !== null) {
+    console.log('There is another callback to make progress. Skip');
+    return;
+  } 
+
+  var timestamp = (new Date()).getTime();
+  properties.setProperty(getLockKey(email), timestamp);
   var json = JSON.parse(metadata);
   var folder = DriveApp.getFolderById(json.folder.id);
   var spreadsheet = SpreadsheetApp.openById(json.report_spreadsheet.id);
   var sheet = spreadsheet.getSheetByName(getOperationLogSheetName());
   var progress = spreadsheet.getSheetByName(getProgressSheetName());
-  iterateFolder(folder, json.operation, json.entity, json.include_subfolder, json.dry_run, json.delete_ops, json.rename_ops, sheet, progress);
+  try {
+    iterateFolder(folder, json.operation, json.entity, json.include_subfolder, json.dry_run, json.delete_ops, json.rename_ops, sheet, progress, timestamp);
+  } catch(e) {
+    console.log('error in onScheduledRun:' + e);
+  }
+  properties.deleteProperty(getLockKey(email));
 }
 
-function iterateFolder(folder, operation, entity, include_subfolder, dryrun, delete_ops, rename_ops, sheet, progress) {
+function iterateFolder(folder, operation, entity, include_subfolder, dryrun, delete_ops, rename_ops, sheet, progress, timestamp) {
   var email = Session.getEffectiveUser().getEmail();
-  console.log('Iterate entity in folder: email = ' + email + ', folder = ' + folder + ', operation = ' + operation + ', entity = ' + entity + ', include_subfolder = ' + include_subfolder + ', dryrun = ' + dryrun + ', delete_ops = ' + JSON.stringify(delete_ops) + ', rename_ops = ' + JSON.stringify(rename_ops));
+  console.log('Iterate entity in folder: email = ' + email + ', folder = ' + folder + ', operation = ' + operation + ', entity = ' + entity + ', include_subfolder = ' + include_subfolder + ', dryrun = ' + dryrun + ', delete_ops = ' + JSON.stringify(delete_ops) + ', rename_ops = ' + JSON.stringify(rename_ops) + ', lock was hold at = ' + timestamp);
   var MAX_RUNNING_TIME_MS = 4.5 * 60 * 1000;
   var startTime = (new Date()).getTime();
   var jobKey = getJobStatusKey(email);
   var jobMetadataKey = getJobMetadataKey(email);
+  var lockKey = getLockKey(email);
   var properties = PropertiesService.getUserProperties();
-  var iterationState = JSON.parse(properties.getProperty(jobKey));
+  var jobValue = properties.getProperty(jobKey);
+  var iterationState = JSON.parse(jobValue);
   if (iterationState !== null) {
     if (folder.getName() !== iterationState[0].folderName) {
       console.error("Iterating a new folder: " + folder.getName() + ". End early since existing operation is not done.");
@@ -288,27 +307,33 @@ function iterateFolder(folder, operation, entity, include_subfolder, dryrun, del
   }
   if (iterationState === null) {
     console.info("Starting new iteration for folder: " + folder.getName());
-    progress.appendRow([(new Date()).getTime(), "STARTED"]);
+    progress.appendRow([new Date(), "STARTED"]);
     iterationState = [];
     iterationState.push(makeIterationFromFolder(folder, operation, entity, delete_ops, rename_ops));
   }  
 
-  progress.appendRow([(new Date()).getTime(), "STARTED NEW ITERATION"]);
+  progress.appendRow([new Date(), "STARTED NEW ITERATION"]);
   while (iterationState.length > 0) {
     iterationState = nextIteration(iterationState, operation, entity, include_subfolder, dryrun, delete_ops, rename_ops, sheet);
     var currTime = (new Date()).getTime();
     var elapsedTimeInMS = currTime - startTime;
     var timeLimitExceeded = elapsedTimeInMS >= MAX_RUNNING_TIME_MS;
     if (timeLimitExceeded) {
-      properties.setProperty(jobKey, JSON.stringify(iterationState));
+      if (properties.getProperty(lockKey) !== timestamp) {
+        console.info('Lock has been overwritten, which means others hold the lock at race condition time. Abort without committing.');
+        progress.appendRow([(new Date()).getTime(), "ENDED NEW ITERATION WITH OUT COMMITTING"]);
+      } else {
+        properties.setProperty(jobKey, JSON.stringify(iterationState));
+        progress.appendRow([(new Date()).getTime(), "ENDED NEW ITERATION"]);
+      }
       console.info("Stopping loop after '%d' milliseconds.", elapsedTimeInMS);
-      progress.appendRow([(new Date()).getTime(), "ENDED NEW ITERATION"]);
       return;
     }
   }
   
   console.info("Done iterating. Deleting iterating state ... ");
-  progress.appendRow([(new Date()).getTime(), "DONE"]);
+  progress.appendRow([new Date(), "ENDED NEW ITERATION"]);
+  progress.appendRow([new Date(), "DONE"]);
   properties.deleteProperty(jobKey);
   properties.deleteProperty(jobMetadataKey);
   deleteAllTriggersForUser();
