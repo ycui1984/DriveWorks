@@ -321,10 +321,10 @@ function iterateFolder(folder, operation, entity, include_subfolder, dryrun, del
     if (timeLimitExceeded) {
       if (properties.getProperty(lockKey) !== timestamp) {
         console.info('Lock has been overwritten, which means others hold the lock at race condition time. Abort without committing.');
-        progress.appendRow([(new Date()).getTime(), "ENDED NEW ITERATION WITH OUT COMMITTING"]);
+        progress.appendRow([new Date(), "ENDED NEW ITERATION WITH OUT COMMITTING"]);
       } else {
         properties.setProperty(jobKey, JSON.stringify(iterationState));
-        progress.appendRow([(new Date()).getTime(), "ENDED NEW ITERATION"]);
+        progress.appendRow([new Date(), "ENDED NEW ITERATION"]);
       }
       console.info("Stopping loop after '%d' milliseconds.", elapsedTimeInMS);
       return;
