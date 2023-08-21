@@ -7,13 +7,13 @@ function applyDeleteOnFile(file, dryrun, delete_ops, include_subfolder, sheet) {
   var matchStr = getMatchStr(delete_ops);
   var fileName = file.getName();
   if (matchStr === null || fileName.includes(matchStr)) {
+    console.log('Deleting file ' + fileName);
     if (dryrun) {
-      console.log('Deleting file ' + fileName);
-      sheet.appendRow(["File", "Delete", "Yes", include_subfolder, fileName])
+      sheet.appendRow(["File", "Delete", "Yes", include_subfolder, fileName, "N/A"]);
       return;
     }
 
-    sheet.appendRow(["File", "Delete", "No", include_subfolder, fileName])
+    sheet.appendRow(["File", "Delete", "No", include_subfolder, fileName, "N/A"]);
     file.setTrashed(true);
   }
 }
@@ -26,13 +26,13 @@ function applyDeleteOnFolder(folder, dryrun, delete_ops, include_subfolder, shee
     if (delete_ops.delete_empty_folder) {
       if (notEmpty) return;
     }
+    console.log('Deleting folder ' + folderName);
     if (dryrun) {
-      sheet.appendRow(["Folder", "Delete", "Yes", include_subfolder, folderName])
-      console.log('Deleting folder ' + folderName);
+      sheet.appendRow(["Folder", "Delete", "Yes", include_subfolder, folderName, "N/A"]);
       return;
     }
 
-    sheet.appendRow(["Folder", "Delete", "No", include_subfolder, folderName])
+    sheet.appendRow(["Folder", "Delete", "No", include_subfolder, folderName, "N/A"]);
     folder.setTrashed(true);
   }
 }
@@ -59,13 +59,13 @@ function applyRenameOnFile(file, dryrun, rename_ops, include_subfolder, sheet) {
   var fileName = file.getName();
   if (matchStr === null || fileName.includes(matchStr)) {
     var new_name = getNewName(fileName, rename_ops);
+    console.log('Renaming file ' + fileName + ' into new name = ' + new_name);
     if (dryrun) {
-      sheet.appendRow(["File", "Rename", "Yes", include_subfolder, fileName])
-      console.log('Renaming file ' + fileName + ' into new name = ' + new_name);
+      sheet.appendRow(["File", "Rename", "Yes", include_subfolder, fileName, new_name]);
       return;
     }
 
-    sheet.appendRow(["File", "Rename", "No", include_subfolder, fileName])
+    sheet.appendRow(["File", "Rename", "No", include_subfolder, fileName, new_name]);
     file.setName(new_name);
   }
 }
@@ -75,13 +75,13 @@ function applyRenameOnFolder(folder, dryrun, rename_ops, include_subfolder, shee
   var folderName = folder.getName();
   if (matchStr === null || folderName.includes(matchStr)) {
     var new_name = getNewName(folderName, rename_ops);
+    console.log('Renaming folder ' + folderName + ' into new name = ' + new_name);
     if (dryrun) {
-      sheet.appendRow(["Folder", "Rename", "Yes", include_subfolder, folderName])
-      console.log('Renaming folder ' + folderName + ' into new name = ' + new_name);
+      sheet.appendRow(["Folder", "Rename", "Yes", include_subfolder, folderName, new_name]);
       return;
     }
 
-    sheet.appendRow(["Folder", "Rename", "No", include_subfolder, folderName])
+    sheet.appendRow(["Folder", "Rename", "No", include_subfolder, folderName, new_name]);
     folder.setName(new_name);  
   }
 }
@@ -272,7 +272,7 @@ function onScheduledRun(e) {
     return;
   } 
 
-  var timestamp = (new Date()).getTime();
+  var timestamp = (new Date()).getTime().toString();
   properties.setProperty(getLockKey(email), timestamp);
   var json = JSON.parse(metadata);
   var folder = DriveApp.getFolderById(json.folder.id);
@@ -368,7 +368,7 @@ function setMetadata(folder, operation, entity, dryrun, include_subfolder, delet
   var jobMetadataKey = getJobMetadataKey(email);
   var spreadsheet = SpreadsheetApp.create("DriveWorks_progress_report_" + Date.now());
   var sheet = spreadsheet.insertSheet(getOperationLogSheetName());
-  sheet.appendRow(["Entity", "Operation", "Dry run", "Include subfolder", "Entity name"]);
+  sheet.appendRow(["Entity", "Operation", "Dry run", "Include subfolder", "Entity name", "Updated name"]);
   var progress = spreadsheet.insertSheet(getProgressSheetName());
   progress.appendRow(["Time", "Progress"]);
   spreadsheet.deleteSheet(spreadsheet.getSheetByName('Sheet1'));
@@ -723,7 +723,7 @@ function createDeleteFolderCard(include_subfolder, dryrun) {
   var deleteEmpty = CardService.newSelectionInput()
     .setType(CardService.SelectionInputType.CHECK_BOX)
     .setFieldName("delete_empty_folders_field")
-    .addItem("Delete empty folders only", "delete_empty_folder", true);
+    .addItem("Delete empty folders only", "delete_empty_folder", false);
   mainSection.addWidget(deleteEmpty);
 
   var foldernameMatch = CardService.newTextInput()
