@@ -319,8 +319,8 @@ function iterateFolder(folder, operation, entity, include_subfolder, dryrun, del
     var elapsedTimeInMS = currTime - startTime;
     var timeLimitExceeded = elapsedTimeInMS >= MAX_RUNNING_TIME_MS;
     if (timeLimitExceeded) {
-      if (properties.getProperty(lockKey) !== timestamp) {
-        console.info('Lock has been overwritten, which means others hold the lock at race condition time. Abort without committing.');
+      if (properties.getProperty(lockKey) !== timestamp || properties.getProperty(jobKey) !== jobValue) {
+        console.info('Lock has been overwritten or jobValue has been overwritten, which means others committed at race condition time. Abort without committing.');
         progress.appendRow([new Date(), "ENDED NEW ITERATION WITH OUT COMMITTING"]);
       } else {
         properties.setProperty(jobKey, JSON.stringify(iterationState));
