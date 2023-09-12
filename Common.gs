@@ -334,9 +334,17 @@ function iterateFolder(folder, operation, entity, include_subfolder, dryrun, del
   console.info("Done iterating. Deleting iterating state ... ");
   progress.appendRow([new Date(), "ENDED NEW ITERATION"]);
   progress.appendRow([new Date(), "DONE"]);
+  var url = sheet.getParent().getUrl();
+  sendCompletionEmail(email, url);
   properties.deleteProperty(jobKey);
   properties.deleteProperty(jobMetadataKey);
   deleteAllTriggersForUser();
+}
+
+ function sendCompletionEmail(email, url) {
+  var message = 'Dear DriveWorks User,\n\n  The job has been completed, please check the progress spreadsheet for the details. Here is the spreadsheet URL ' + url + '.\n\n\nThanks!';
+  console.log('sendUsageExpireEmail:' + email + ', message = ' + message);
+  MailApp.sendEmail(email, 'Job completed by DriveWorks', message);  
 }
 
 
