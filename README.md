@@ -24,3 +24,8 @@ Click `Deploy` and `Test Deployments`
 
 # Demo Video
 See https://www.youtube.com/watch?v=MWWHMgO7vP8 as an example on how to manage Google files/folders in batch.
+
+# Donations
+If this addon make your life easier, please consider to donate to encourage development.
+Buymeacoffee https://www.buymeacoffee.com/smartgas
+Paypal https://www.paypal.com/paypalme/SmartGAS888
