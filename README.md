@@ -20,4 +20,7 @@ Click `New Project`
 ## Step4. After you have the project
 Click `Deploy` and `Test Deployments`
 
-## Step5. Goto your google drive. The driveworks addon logo should show up at very right. 
+## Step5. Goto your google drive. The driveworks addon logo should show up at very right.
+
+# Demo Video
+See https://www.youtube.com/watch?v=MWWHMgO7vP8 as an example on how to manage Google files/folders in batch.
