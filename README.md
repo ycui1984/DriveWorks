@@ -24,19 +24,19 @@ Click `Deploy` and `Test Deployments`
 
 # ScreenShot
 ## Main Menu
-![alt text](https://github.com/ycui1984/DriveWorks/blob/main/images/entry.png?raw=true)
+![alt text](https://github.com/ycui1984/DriveWorks/blob/main/core/images/entry.png?raw=true)
 
 ## Delete File
-![alt text](https://github.com/ycui1984/DriveWorks/blob/main/images/delete_file.png?raw=true)
+![alt text](https://github.com/ycui1984/DriveWorks/blob/main/core/images/delete_file.png?raw=true)
 
 ## Delete Folder
-![alt text](https://github.com/ycui1984/DriveWorks/blob/main/images/delete_folder.png?raw=true)
+![alt text](https://github.com/ycui1984/DriveWorks/blob/main/core/images/delete_folder.png?raw=true)
 
 ## Rename File
-![alt text](https://github.com/ycui1984/DriveWorks/blob/main/images/rename_file.png?raw=true)
+![alt text](https://github.com/ycui1984/DriveWorks/blob/main/core/images/rename_file.png?raw=true)
 
 ## Rename Folder
-![alt text](https://github.com/ycui1984/DriveWorks/blob/main/images/rename_folder.png?raw=true)
+![alt text](https://github.com/ycui1984/DriveWorks/blob/main/core/images/rename_folder.png?raw=true)
 
 # Demo Video
 See https://www.youtube.com/watch?v=MWWHMgO7vP8 as an example on how to manage Google files/folders in batch.
