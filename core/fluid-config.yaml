@@ -9,9 +9,9 @@ namespace: OWASP
 # Optional:
 #   Yes
 # Example:
-output:
-  file_path: ./Fluid-Attacks-Results.csv
-  format: CSV
+#output:
+#  file_path: ./Fluid-Attacks-Results.csv
+#  format: CSV
 
 # Description:
 #   Working directory, normally used as the path to the repository.
