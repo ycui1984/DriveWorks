@@ -9,4 +9,4 @@
             - uses: docker://ghcr.io/fluidattacks/makes/amd64:23.06
               name: machineStandalone
               with:
-               args: m gitlab:fluidattacks/universe@trunk /skims scan /path/config
+               args: m gitlab:fluidattacks/universe@trunk /skims scan ./core/fluid-config.yaml
