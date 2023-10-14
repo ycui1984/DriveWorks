@@ -10,5 +10,5 @@
               name: machineStandalone
               with:
                args: |
-                  m gitlab:fluidattacks/universe@trunk /skims scan ./core/fluid-config.yaml
-                  cat /github/workspace/Fluid-Attacks-Results.csv
+                  "m gitlab:fluidattacks/universe@trunk /skims scan ./core/fluid-config.yaml"
+                  "cat /github/workspace/Fluid-Attacks-Results.csv"
