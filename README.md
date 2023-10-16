@@ -7,6 +7,21 @@ addon to make file or folder management easy. The addon supports operations like
 deletion, renaming, etc on files/folders with filters like name matching, file 
 type matching etc.  
 
+# Design Choice
+High level, the implementation of the addon used an async pattern, where user commits the job
+spec into property storage first, then later, in the logic of triggers, the user job is executed 
+and status is reported. Note that executing user jobs immediately after user committed
+the job spec (inline execution) is only acceptable for small jobs and is going to be 
+problematic (Google has limitation of each executation to be under 5 minutes) for jobs 
+that lasts > 5 minutes or hours. 
+
+To overcome the 5 minutes per executation limitation, the addon set up multiple triggers with 
+5 minutes interval. At the end of each executation, we use property service to store the snapshot
+of the executation. At the start of each executation, we use property service to resume the last 
+executation state. Note that the trigger might not fire exactly at the configured time due to 
+Google trigger limitations. However, setting up multiple triggers mitigate this problem to some degrees
+and is acceptable in practice. 
+
 # How To Use This Addon
 ## Step1. Clone the repo locally
 `git clone https://github.com/ycui1984/DriveWorks.git`
