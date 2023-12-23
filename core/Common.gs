@@ -1132,7 +1132,7 @@ function getPaymentSection() {
 }
 
 function getLogoURL() {
-  return "https://lh3.googleusercontent.com/drive-viewer/AK7aPaAP_gTj8QXAz5UIJqS_pibSMclBtiMzLAm_c5-HADz12sLYCo_YvKHaKF0TXnchhJJxsQkFXYFNsWRs4LnNvYL5uAKz=s2560";
+  return "https://drive.google.com/uc?id=1YRuaxhrXiRlLu1SbTZopBKTDElfO3QIx";
 }
 
 function createHomeCard(item={}) {

@@ -1,7 +1,6 @@
 {
   "timeZone": "America/Los_Angeles",
-  "dependencies": {
-  },
+  "dependencies": {},
   "exceptionLogging": "STACKDRIVER",
   "oauthScopes": [
     "https://www.googleapis.com/auth/drive.addons.metadata.readonly",
@@ -16,7 +15,7 @@
   "addOns": {
     "common": {
       "name": "DriveWorks",
-      "logoUrl": "https://lh3.googleusercontent.com/drive-viewer/AK7aPaAP_gTj8QXAz5UIJqS_pibSMclBtiMzLAm_c5-HADz12sLYCo_YvKHaKF0TXnchhJJxsQkFXYFNsWRs4LnNvYL5uAKz=s2560",
+      "logoUrl": "https://drive.google.com/uc?id=1YRuaxhrXiRlLu1SbTZopBKTDElfO3QIx",
       "useLocaleFromApp": true,
       "homepageTrigger": {
         "runFunction": "onHomepage",
