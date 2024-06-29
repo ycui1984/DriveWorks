@@ -480,10 +480,12 @@ function onScheduledRunNear55(e) {
 function installTriggersForUsers() {
   var email = Session.getEffectiveUser().getEmail();
   deleteAllTriggersForUser();
-  for (var i = 0; i < 60; i+= 5) {
-    console.log('installTriggersForUsers: email = ' + email + ', near min = ' + i);
-    ScriptApp.newTrigger("onScheduledRunNear" + i.toString()).timeBased().everyHours(1).nearMinute(i).create();
-  }
+  // for (var i = 0; i < 60; i+= 5) {
+  //   console.log('installTriggersForUsers: email = ' + email + ', near min = ' + i);
+  //   ScriptApp.newTrigger("onScheduledRunNear" + i.toString()).timeBased().everyHours(1).nearMinute(i).create();
+  // }
+  console.log('installTriggersForUsers: email = ' + email + ', near min = 0');
+  ScriptApp.newTrigger("onScheduledRunNear0").timeBased().everyHours(1).nearMinute(0).create();
 }
 
 function deleteFileHandler(e) {
@@ -1160,7 +1162,7 @@ function createHomeCard(item={}) {
   var dryrun = CardService.newSelectionInput()
     .setType(CardService.SelectionInputType.CHECK_BOX)
     .setFieldName("dryrun_field")
-    .addItem("Preview operations only without executing (dryrun)", "dryrun", true);
+    .addItem("Preview operations only without executing (dryrun)", "dryrun", false);
 
   var includeSubfolder = CardService.newSelectionInput()
     .setType(CardService.SelectionInputType.CHECK_BOX)
