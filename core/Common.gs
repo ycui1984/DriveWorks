@@ -1,5 +1,11 @@
 function onHomepage(e) {
-  console.log('onHomePage = ' + JSON.stringify(e));
+  console.log('onHomePage: ' + JSON.stringify(e));
+  var statusCard = buildCardViaPropertiesIfExist();
+  if (statusCard) {
+    console.log('onHomePage: return existing status card');
+    return statusCard.build();
+  }
+  console.log('onHomePage: return brand new home card');
   return createHomeCard();
 }
 
@@ -513,11 +519,7 @@ function deleteJob() {
   var jobMetadataKey = getJobMetadataKey(email);
   var properties = PropertiesService.getUserProperties();
   properties.deleteProperty(jobMetadataKey);
-  var navigation = CardService.newNavigation()
-      .popCard();
-  var actionResponse = CardService.newActionResponseBuilder()
-      .setNavigation(navigation);
-  return actionResponse.build();
+  return createHomeCard();
 }
 
 
